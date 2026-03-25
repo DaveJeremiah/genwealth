@@ -42,7 +42,8 @@ const getMonthOptions = () => {
 };
 
 const FinancialStatements = ({ transactions }: Props) => {
-  const fmt = (n: number) => `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  const { format: fmtCurrency, convert } = useCurrency();
+  const fmt = (n: number) => fmtCurrency(Math.abs(n), "USD");
   const weekOptions = useMemo(getWeekOptions, []);
   const monthOptions = useMemo(getMonthOptions, []);
 
