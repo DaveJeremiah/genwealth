@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Transaction } from "@/hooks/useTransactions";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, parseISO, subWeeks, subMonths } from "date-fns";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, subWeeks, subMonths } from "date-fns";
 
 interface Props {
   transactions: Transaction[];
