@@ -10,6 +10,7 @@ import FinancialStatements from "@/components/FinancialStatements";
 import Charts from "@/components/Charts";
 import TransactionLog from "@/components/TransactionLog";
 import WealthAnalysis from "@/components/WealthAnalysis";
+import NetWorthTracker from "@/components/NetWorthTracker";
 
 const Index = () => {
   const { signOut } = useAuth();
@@ -54,13 +55,17 @@ const Index = () => {
         <TransactionInput onInsight={setLatestInsight} />
 
         {/* Tabs */}
-        <Tabs defaultValue="statements" className="space-y-4">
+        <Tabs defaultValue="networth" className="space-y-4">
           <TabsList className="bg-secondary border border-border">
+            <TabsTrigger value="networth" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Net Worth</TabsTrigger>
             <TabsTrigger value="statements" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Statements</TabsTrigger>
             <TabsTrigger value="charts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Charts</TabsTrigger>
             <TabsTrigger value="analysis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Analysis</TabsTrigger>
             <TabsTrigger value="log" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Log</TabsTrigger>
           </TabsList>
+          <TabsContent value="networth">
+            <NetWorthTracker />
+          </TabsContent>
           <TabsContent value="statements">
             <FinancialStatements transactions={transactions} />
           </TabsContent>
