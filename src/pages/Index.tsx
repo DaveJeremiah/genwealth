@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { useTransactions } from "@/hooks/useTransactions";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, LogOut, Sparkles } from "lucide-react";
+import { TrendingUp, LogOut, Sparkles, DollarSign } from "lucide-react";
 import TransactionInput from "@/components/TransactionInput";
 import StatsCards from "@/components/StatsCards";
 import FinancialStatements from "@/components/FinancialStatements";
@@ -14,6 +15,7 @@ import NetWorthTracker from "@/components/NetWorthTracker";
 
 const Index = () => {
   const { signOut } = useAuth();
+  const { showUSD, toggleUSD } = useCurrency();
   const { data: transactions = [] } = useTransactions();
   const [latestInsight, setLatestInsight] = useState<string | null>(null);
 
@@ -28,10 +30,22 @@ const Index = () => {
             </div>
             <span className="text-lg font-display font-bold gold-text">Wealth OS</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground gap-1.5">
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Sign Out</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleUSD}
+              className={`text-xs gap-1.5 ${showUSD ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              title={showUSD ? "Showing all in USD" : "Show original currencies"}
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{showUSD ? "USD Mode" : "Multi-Currency"}</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground gap-1.5">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
