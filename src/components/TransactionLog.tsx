@@ -21,7 +21,7 @@ const TransactionLog = () => {
   return (
     <div className="glass-card rounded-xl p-5 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h3 className="font-display text-lg font-semibold">Transaction Log</h3>
+        <h3 className="text-lg font-semibold font-mono">Transaction Log</h3>
         <div className="flex gap-2">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[130px] bg-secondary border-border text-sm">
@@ -41,18 +41,18 @@ const TransactionLog = () => {
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
+              {categories.map((c) =>
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No transactions found</p>
-      ) : (
-        <div className="overflow-x-auto">
+      {filtered.length === 0 ?
+      <p className="text-sm text-muted-foreground text-center py-8">No transactions found</p> :
+
+      <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-muted-foreground">
@@ -65,8 +65,8 @@ const TransactionLog = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => (
-                <tr key={t.id} className="border-b border-border/50 hover:bg-secondary/50 transition-colors">
+              {filtered.map((t) =>
+            <tr key={t.id} className="border-b border-border/50 hover:bg-secondary/50 transition-colors">
                   <td className="py-2.5 text-muted-foreground">{t.date}</td>
                   <td className="py-2.5 text-foreground">{t.description}</td>
                   <td className={`py-2.5 font-medium ${t.type === "income" || t.type === "asset" ? "text-primary" : "text-destructive"}`}>
@@ -74,30 +74,30 @@ const TransactionLog = () => {
                   </td>
                   <td className="py-2.5 hidden sm:table-cell">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      t.type === "income" || t.type === "asset" ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"
-                    }`}>
+                t.type === "income" || t.type === "asset" ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"}`
+                }>
                       {t.type}
                     </span>
                   </td>
                   <td className="py-2.5 text-muted-foreground hidden md:table-cell">{t.category}</td>
                   <td className="py-2.5">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteTransaction.mutate(t.id)}
-                    >
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteTransaction.mutate(t.id)}>
+                  
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </td>
                 </tr>
-              ))}
+            )}
             </tbody>
           </table>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default TransactionLog;

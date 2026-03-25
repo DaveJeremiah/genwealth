@@ -36,8 +36,8 @@ const Index = () => {
               size="sm"
               onClick={toggleUSD}
               className={`text-xs gap-1.5 ${showUSD ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-              title={showUSD ? "Showing all in USD" : "Show original currencies"}
-            >
+              title={showUSD ? "Showing all in USD" : "Show original currencies"}>
+              
               <DollarSign className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{showUSD ? "USD Mode" : "Multi-Currency"}</span>
             </Button>
@@ -50,17 +50,17 @@ const Index = () => {
       </header>
 
       {/* Main */}
-      <main className="container px-4 py-6 space-y-6 max-w-6xl">
+      <main className="container px-4 py-6 space-y-6 max-w-6xl font-sans">
         {/* AI Insight Banner */}
-        {latestInsight && (
-          <div className="rounded-xl p-4 border border-primary/30 bg-primary/5 flex items-start gap-3">
+        {latestInsight &&
+        <div className="rounded-xl p-4 border border-primary/30 bg-primary/5 flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <div>
               <p className="text-xs text-primary font-semibold mb-1">Latest AI Insight</p>
               <p className="text-sm text-foreground">{latestInsight}</p>
             </div>
           </div>
-        )}
+        }
 
         {/* Stats */}
         <StatsCards transactions={transactions} />
@@ -94,8 +94,8 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
-    </div>
-  );
+    </div>);
+
 };
 
 export default Index;

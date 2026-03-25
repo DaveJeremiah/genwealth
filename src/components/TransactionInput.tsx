@@ -73,7 +73,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("parse-transactions", {
-        body: { input: input.trim() },
+        body: { input: input.trim() }
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
@@ -92,7 +92,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
 
   return (
     <div className="glass-card rounded-xl p-5 space-y-3">
-      <h3 className="font-display text-lg font-semibold text-foreground">Log Transactions</h3>
+      <h3 className="text-lg font-semibold text-foreground font-mono">Log Transactions</h3>
       <p className="text-xs text-muted-foreground">
         Describe your financial activity in plain language — type or use the mic
       </p>
@@ -104,40 +104,40 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
           className="bg-secondary border-border text-foreground placeholder:text-muted-foreground min-h-[80px] resize-none pr-12"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
-          }}
-        />
+          }} />
+        
         <button
           type="button"
           onClick={toggleListening}
           className={`absolute right-3 top-3 p-1.5 rounded-full transition-colors ${
-            listening
-              ? "bg-destructive/20 text-destructive animate-pulse"
-              : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-          }`}
-          title={listening ? "Stop listening" : "Voice input"}
-        >
+          listening ?
+          "bg-destructive/20 text-destructive animate-pulse" :
+          "text-muted-foreground hover:text-primary hover:bg-primary/10"}`
+          }
+          title={listening ? "Stop listening" : "Voice input"}>
+          
           {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
         </button>
       </div>
       <div className="flex items-center justify-between">
-        {listening && (
-          <span className="text-xs text-destructive flex items-center gap-1.5">
+        {listening &&
+        <span className="text-xs text-destructive flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
             Listening…
           </span>
-        )}
+        }
         <div className="flex-1" />
         <Button
           onClick={handleSubmit}
           disabled={loading || !input.trim()}
-          className="gold-gradient text-primary-foreground font-semibold gap-2"
-        >
+          className="gold-gradient text-primary-foreground font-semibold gap-2">
+          
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {loading ? "Parsing..." : "Process"}
         </Button>
       </div>
-    </div>
-  );
+    </div>);
+
 };
 
 export default TransactionInput;
