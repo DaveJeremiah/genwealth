@@ -55,7 +55,7 @@ const Index = () => {
         <TransactionInput onInsight={setLatestInsight} />
 
         {/* Tabs */}
-        <Tabs defaultValue="statements" className="space-y-4">
+        <Tabs defaultValue="networth" className="space-y-4">
           <TabsList className="bg-secondary border border-border">
             <TabsTrigger value="networth" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Net Worth</TabsTrigger>
             <TabsTrigger value="statements" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Statements</TabsTrigger>
