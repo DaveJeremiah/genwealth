@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Transaction } from "@/hooks/useTransactions";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank } from "lucide-react";
 
 interface StatsCardsProps {
@@ -7,17 +8,17 @@ interface StatsCardsProps {
 }
 
 const StatsCards = ({ transactions }: StatsCardsProps) => {
-  const stats = useMemo(() => {
-    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-    const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-    const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.amount, 0);
-    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.amount, 0);
-    const netWorth = assets - liabilities;
-    const cashFlow = income - expenses;
-    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+  const { convert, format: fmtCurrency } = useCurrency();
 
-    return { income, expenses, assets, liabilities, netWorth, cashFlow, savingsRate };
-  }, [transactions]);
+  const stats = useMemo(() => {
+    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + convert(t.amount, t.currency), 0);
+    const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + convert(t.amount, t.currency), 0);
+    const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + convert(t.amount, t.currency), 0);
+    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + convert(t.amount, t.currency), 0);
+    const netWorth = assets - liabilities;
+    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+    return { income, expenses, netWorth, savingsRate };
+  }, [transactions, convert]);
 
   const cards = [
     { label: "Net Worth", value: stats.netWorth, icon: DollarSign, highlight: true },
@@ -27,16 +28,14 @@ const StatsCards = ({ transactions }: StatsCardsProps) => {
   ];
 
   const fmt = (n: number, suffix?: string) =>
-    suffix ? `${n.toFixed(1)}${suffix}` : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    suffix ? `${n.toFixed(1)}${suffix}` : fmtCurrency(n, "USD");
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((c) => (
         <div
           key={c.label}
-          className={`rounded-xl p-5 space-y-2 ${
-            c.highlight ? "gold-gradient" : "glass-card"
-          }`}
+          className={`rounded-xl p-5 space-y-2 ${c.highlight ? "gold-gradient" : "glass-card"}`}
         >
           <div className="flex items-center gap-2">
             <c.icon className={`w-4 h-4 ${c.highlight ? "text-primary-foreground" : "text-primary"}`} />
