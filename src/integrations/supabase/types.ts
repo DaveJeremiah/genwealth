@@ -14,7 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      net_worth_snapshots: {
+        Row: {
+          id: string
+          net_worth: number
+          snapshot_date: string
+          total_assets: number
+          total_liabilities: number
+          user_id: string
+          wealth_score: number | null
+        }
+        Insert: {
+          id?: string
+          net_worth: number
+          snapshot_date?: string
+          total_assets?: number
+          total_liabilities?: number
+          user_id: string
+          wealth_score?: number | null
+        }
+        Update: {
+          id?: string
+          net_worth?: number
+          snapshot_date?: string
+          total_assets?: number
+          total_liabilities?: number
+          user_id?: string
+          wealth_score?: number | null
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          account: string
+          amount: number
+          category: string
+          created_at: string
+          currency: string
+          date: string
+          description: string
+          id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          account?: string
+          amount: number
+          category?: string
+          created_at?: string
+          currency?: string
+          date?: string
+          description: string
+          id?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          account?: string
+          amount?: number
+          category?: string
+          created_at?: string
+          currency?: string
+          date?: string
+          description?: string
+          id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
