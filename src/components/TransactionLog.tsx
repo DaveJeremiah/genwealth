@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Transaction, useTransactions } from "@/hooks/useTransactions";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 
 const TransactionLog = () => {
   const { data: transactions = [], deleteTransaction } = useTransactions();
+  const { format: fmtCurrency } = useCurrency();
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
@@ -15,8 +17,6 @@ const TransactionLog = () => {
     if (categoryFilter !== "all" && t.category !== categoryFilter) return false;
     return true;
   });
-
-  const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="glass-card rounded-xl p-5 space-y-4">
@@ -70,15 +70,11 @@ const TransactionLog = () => {
                   <td className="py-2.5 text-muted-foreground">{t.date}</td>
                   <td className="py-2.5 text-foreground">{t.description}</td>
                   <td className={`py-2.5 font-medium ${t.type === "income" || t.type === "asset" ? "text-primary" : "text-destructive"}`}>
-                    {t.type === "expense" || t.type === "liability" ? "-" : "+"}{fmt(t.amount)}
-                    {t.currency !== "USD" && <span className="text-muted-foreground ml-1 text-xs">{t.currency}</span>}
+                    {fmtCurrency(t.amount, t.currency, { sign: t.type === "income" || t.type === "asset" })}
                   </td>
                   <td className="py-2.5 hidden sm:table-cell">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      t.type === "income" ? "bg-primary/20 text-primary" :
-                      t.type === "expense" ? "bg-destructive/20 text-destructive" :
-                      t.type === "asset" ? "bg-primary/20 text-primary" :
-                      "bg-destructive/20 text-destructive"
+                      t.type === "income" || t.type === "asset" ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"
                     }`}>
                       {t.type}
                     </span>
