@@ -12,6 +12,7 @@ import Charts from "@/components/Charts";
 import TransactionLog from "@/components/TransactionLog";
 import WealthAnalysis from "@/components/WealthAnalysis";
 import NetWorthTracker from "@/components/NetWorthTracker";
+import AIChatAssistant from "@/components/AIChatAssistant";
 
 const Index = () => {
   const { signOut } = useAuth();
