@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const TransactionLog = () => {
   const { data: transactions = [], deleteTransaction, updateTransaction } = useTransactions();
-  const { format: fmtCurrency } = useCurrency();
+  const { formatUGX, formatOriginal } = useCurrency();
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editId, setEditId] = useState<string | null>(null);
@@ -27,7 +27,6 @@ const TransactionLog = () => {
     return true;
   });
 
-  // Apply manual ordering if set
   const displayList = orderedIds
     ? orderedIds.map((id) => filtered.find((t) => t.id === id)).filter(Boolean) as Transaction[]
     : filtered;
@@ -46,7 +45,6 @@ const TransactionLog = () => {
     setEditFields({});
   };
 
-  // Drag and drop reorder
   const handleDragStart = (id: string) => {
     setDragId(id);
     if (!orderedIds) setOrderedIds(displayList.map((t) => t.id));
@@ -105,7 +103,8 @@ const TransactionLog = () => {
                 <th className="w-8"></th>
                 <th className="text-left py-2 font-medium">Date</th>
                 <th className="text-left py-2 font-medium">Description</th>
-                <th className="text-left py-2 font-medium">Amount</th>
+                <th className="text-left py-2 font-medium">Original</th>
+                <th className="text-left py-2 font-medium">Value</th>
                 <th className="text-left py-2 font-medium hidden sm:table-cell">Type</th>
                 <th className="text-left py-2 font-medium hidden md:table-cell">Category</th>
                 <th className="py-2 w-20"></th>
@@ -155,7 +154,7 @@ const TransactionLog = () => {
                           className="h-8 text-xs bg-secondary border-border"
                         />
                       </td>
-                      <td className="py-2.5">
+                      <td className="py-2.5" colSpan={1}>
                         <Input
                           type="number"
                           value={editFields.amount ?? ""}
@@ -163,6 +162,7 @@ const TransactionLog = () => {
                           className="h-8 text-xs w-24 bg-secondary border-border"
                         />
                       </td>
+                      <td className="py-2.5"></td>
                       <td className="py-2.5 hidden sm:table-cell">
                         <Select value={editFields.type ?? t.type} onValueChange={(v) => setEditFields({ ...editFields, type: v })}>
                           <SelectTrigger className="h-8 text-xs bg-secondary border-border w-[100px]">
@@ -198,8 +198,11 @@ const TransactionLog = () => {
                     <>
                       <td className="py-2.5 text-muted-foreground">{t.date}</td>
                       <td className="py-2.5 text-foreground">{t.description}</td>
+                      <td className="py-2.5 text-muted-foreground text-xs">
+                        {t.currency !== "UGX" ? formatOriginal(t.amount, t.currency) : "—"}
+                      </td>
                       <td className={`py-2.5 font-medium ${t.type === "income" || t.type === "asset" ? "text-primary" : "text-destructive"}`}>
-                        {fmtCurrency(t.amount, t.currency, { sign: t.type === "income" || t.type === "asset" })}
+                        {formatUGX(t.ugx_amount, { sign: t.type === "income" || t.type === "asset" })}
                       </td>
                       <td className="py-2.5 hidden sm:table-cell">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${

@@ -4,7 +4,8 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { useTransactions } from "@/hooks/useTransactions";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, LogOut, Sparkles, DollarSign } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TrendingUp, LogOut, Sparkles } from "lucide-react";
 import TransactionInput from "@/components/TransactionInput";
 import StatsCards from "@/components/StatsCards";
 import FinancialStatements from "@/components/FinancialStatements";
@@ -14,9 +15,16 @@ import WealthAnalysis from "@/components/WealthAnalysis";
 import NetWorthTracker from "@/components/NetWorthTracker";
 import AIChatAssistant from "@/components/AIChatAssistant";
 
+const CURRENCY_OPTIONS = [
+  { value: "UGX", label: "UGX (Shilling)" },
+  { value: "USD", label: "USD ($)" },
+  { value: "KES", label: "KES (Shilling)" },
+  { value: "EUR", label: "EUR (€)" },
+] as const;
+
 const Index = () => {
   const { signOut } = useAuth();
-  const { showUSD, toggleUSD } = useCurrency();
+  const { displayCurrency, setDisplayCurrency } = useCurrency();
   const { data: transactions = [] } = useTransactions();
   const [latestInsight, setLatestInsight] = useState<string | null>(null);
 
@@ -32,16 +40,16 @@ const Index = () => {
             <span className="text-lg font-display font-bold gold-text">Wealth OS</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleUSD}
-              className={`text-xs gap-1.5 ${showUSD ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-              title={showUSD ? "Showing all in USD" : "Show original currencies"}>
-              
-              <DollarSign className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{showUSD ? "USD Mode" : "Multi-Currency"}</span>
-            </Button>
+            <Select value={displayCurrency} onValueChange={(v) => setDisplayCurrency(v as any)}>
+              <SelectTrigger className="w-[140px] h-8 bg-secondary border-border text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                {CURRENCY_OPTIONS.map((c) => (
+                  <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground gap-1.5">
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Sign Out</span>
@@ -53,15 +61,15 @@ const Index = () => {
       {/* Main */}
       <main className="container px-4 py-6 space-y-6 max-w-6xl font-sans">
         {/* AI Insight Banner */}
-        {latestInsight &&
-        <div className="rounded-xl p-4 border border-primary/30 bg-primary/5 flex items-start gap-3">
+        {latestInsight && (
+          <div className="rounded-xl p-4 border border-primary/30 bg-primary/5 flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <div>
               <p className="text-xs text-primary font-semibold mb-1">Latest AI Insight</p>
               <p className="text-sm text-foreground">{latestInsight}</p>
             </div>
           </div>
-        }
+        )}
 
         {/* Stats */}
         <StatsCards transactions={transactions} />
@@ -97,8 +105,8 @@ const Index = () => {
 
         <AIChatAssistant />
       </main>
-    </div>);
-
+    </div>
+  );
 };
 
 export default Index;

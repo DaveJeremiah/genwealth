@@ -35,9 +35,9 @@ const WealthAnalysis = () => {
       if (data.error) throw new Error(data.error);
       setResult(data);
 
-      // Save net worth snapshot
-      const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.amount, 0);
-      const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.amount, 0);
+      // Save net worth snapshot using ugx_amount
+      const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.ugx_amount, 0);
+      const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.ugx_amount, 0);
       await supabase.from("net_worth_snapshots").insert({
         user_id: user!.id,
         net_worth: assets - liabilities,

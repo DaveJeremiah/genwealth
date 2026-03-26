@@ -10,6 +10,7 @@ export interface Transaction {
   description: string;
   amount: number;
   currency: string;
+  ugx_amount: number;
   type: string;
   category: string;
   account: string;
@@ -29,7 +30,7 @@ export const useTransactions = () => {
         .select("*")
         .order("date", { ascending: false });
       if (error) throw error;
-      return data as Transaction[];
+      return data as unknown as Transaction[];
     },
     enabled: !!user,
   });
@@ -41,7 +42,8 @@ export const useTransactions = () => {
         date: t.date,
         description: t.description,
         amount: t.amount,
-        currency: t.currency,
+        currency: t.currency || "UGX",
+        ugx_amount: t.ugx_amount || t.amount,
         type: t.type,
         category: t.category,
         account: t.account,
