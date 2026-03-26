@@ -57,6 +57,21 @@ export const useTransactions = () => {
     },
   });
 
+  const updateTransaction = useMutation({
+    mutationFn: async (updates: { id: string } & Partial<Omit<Transaction, "id" | "user_id" | "created_at">>) => {
+      const { id, ...fields } = updates;
+      const { error } = await supabase.from("transactions").update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      toast({ title: "Transaction updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error updating", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteTransaction = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("transactions").delete().eq("id", id);
@@ -71,5 +86,5 @@ export const useTransactions = () => {
     },
   });
 
-  return { ...query, addTransactions, deleteTransaction };
+  return { ...query, addTransactions, updateTransaction, deleteTransaction };
 };
