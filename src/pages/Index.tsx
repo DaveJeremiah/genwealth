@@ -94,6 +94,8 @@ const Index = () => {
             <TransactionLog />
           </TabsContent>
         </Tabs>
+
+        <AIChatAssistant />
       </main>
     </div>);
 
