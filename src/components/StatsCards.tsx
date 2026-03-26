@@ -8,17 +8,17 @@ interface StatsCardsProps {
 }
 
 const StatsCards = ({ transactions }: StatsCardsProps) => {
-  const { convert, format: fmtCurrency } = useCurrency();
+  const { formatUGX } = useCurrency();
 
   const stats = useMemo(() => {
-    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + convert(t.amount, t.currency), 0);
-    const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + convert(t.amount, t.currency), 0);
-    const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + convert(t.amount, t.currency), 0);
-    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + convert(t.amount, t.currency), 0);
+    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
+    const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
+    const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.ugx_amount, 0);
+    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.ugx_amount, 0);
     const netWorth = assets - liabilities;
     const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
     return { income, expenses, netWorth, savingsRate };
-  }, [transactions, convert]);
+  }, [transactions]);
 
   const cards = [
     { label: "Net Worth", value: stats.netWorth, icon: DollarSign, highlight: true },
@@ -28,7 +28,7 @@ const StatsCards = ({ transactions }: StatsCardsProps) => {
   ];
 
   const fmt = (n: number, suffix?: string) =>
-    suffix ? `${n.toFixed(1)}${suffix}` : fmtCurrency(n, "USD");
+    suffix ? `${n.toFixed(1)}${suffix}` : formatUGX(n);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

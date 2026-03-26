@@ -5,6 +5,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const CRYPTOS = ["BTC", "ETH", "SOL", "XRP", "USDT", "USDC", "BNB", "ADA", "DOGE", "DOT"];
+
+async function fiatToUGX(amount: number, currency: string): Promise<number> {
+  if (currency === "UGX") return amount;
+  try {
+    const res = await fetch(`https://api.frankfurter.app/latest?amount=${amount}&from=${currency}&to=UGX`);
+    if (!res.ok) throw new Error(`Frankfurter error: ${res.status}`);
+    const data = await res.json();
+    return data.rates?.UGX ?? amount;
+  } catch (e) {
+    console.error("Fiat conversion error:", e);
+    // Fallback rates to UGX
+    const fallback: Record<string, number> = { USD: 3750, EUR: 4050, GBP: 4700, KES: 29, CAD: 2750, AUD: 2450, JPY: 25, CHF: 4200, CNY: 520, INR: 45, BRL: 750, MXN: 220 };
+    return amount * (fallback[currency] ?? 3750);
+  }
+}
+
+async function cryptoToUGX(amount: number, coinId: string): Promise<number> {
+  const idMap: Record<string, string> = { BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple", USDT: "tether", USDC: "usd-coin", BNB: "binancecoin", ADA: "cardano", DOGE: "dogecoin", DOT: "polkadot" };
+  const id = idMap[coinId.toUpperCase()];
+  if (!id) return amount;
+  try {
+    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`);
+    if (!res.ok) throw new Error(`CoinGecko error: ${res.status}`);
+    const data = await res.json();
+    const usdPrice = data[id]?.usd ?? 0;
+    // Convert USD to UGX
+    return await fiatToUGX(amount * usdPrice, "USD");
+  } catch (e) {
+    console.error("Crypto conversion error:", e);
+    const fallbackUSD: Record<string, number> = { BTC: 67000, ETH: 3500, SOL: 145, XRP: 0.55, USDT: 1, USDC: 1, BNB: 600, ADA: 0.45, DOGE: 0.15, DOT: 7 };
+    return amount * (fallbackUSD[coinId.toUpperCase()] ?? 1) * 3750;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -26,7 +61,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a personal financial accountant. Parse the user's natural language input and return a JSON array of transactions. Each transaction must have: id (generate a random uuid string), date (use ${today} if not specified), description, amount (always positive number), currency (USD/EUR/GBP/ETH/BTC etc), type (income/expense/asset/liability), category (Housing/Food & Dining/Transport/Entertainment/Health/Shopping/Utilities/Investments/Crypto/Property/Salary/Freelance/Business/Savings/Other), account (Cash/Bank/Investment/Crypto/Property/Other). Also return a single 'insight' string — one sharp, direct observation about what was just entered and its implications for wealth building. Return only valid JSON in this exact format: {"transactions": [...], "insight": "..."}`
+            content: `You are a personal financial accountant based in Uganda. Parse the user's natural language input and return a JSON array of transactions. Each transaction must have: id (generate a random uuid string), date (use ${today} if not specified), description, amount (always positive number — the original amount in the original currency), currency (default to UGX if no currency is mentioned. Use standard 3-letter codes: UGX, USD, EUR, GBP, KES, etc. For crypto use: BTC, ETH, SOL, XRP, USDT, USDC, BNB, ADA, DOGE, DOT), type (income/expense/asset/liability), category (Housing/Food & Dining/Transport/Entertainment/Health/Shopping/Utilities/Investments/Crypto/Property/Salary/Freelance/Business/Savings/Other), account (Cash/Bank/Investment/Crypto/Property/Other). Also return a single 'insight' string — one sharp, direct observation about what was just entered and its implications for wealth building. Return only valid JSON in this exact format: {"transactions": [...], "insight": "..."}`
           },
           { role: "user", content: input }
         ],
@@ -89,7 +124,23 @@ serve(async (req) => {
 
     const parsed = JSON.parse(toolCall.function.arguments);
 
-    return new Response(JSON.stringify(parsed), {
+    // Convert each transaction to UGX
+    const enriched = await Promise.all(
+      parsed.transactions.map(async (t: any) => {
+        const cur = (t.currency || "UGX").toUpperCase();
+        let ugxAmount: number;
+        if (cur === "UGX") {
+          ugxAmount = t.amount;
+        } else if (CRYPTOS.includes(cur)) {
+          ugxAmount = await cryptoToUGX(t.amount, cur);
+        } else {
+          ugxAmount = await fiatToUGX(t.amount, cur);
+        }
+        return { ...t, currency: cur, ugx_amount: Math.round(ugxAmount) };
+      })
+    );
+
+    return new Response(JSON.stringify({ transactions: enriched, insight: parsed.insight }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

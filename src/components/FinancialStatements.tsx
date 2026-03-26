@@ -42,8 +42,8 @@ const getMonthOptions = () => {
 };
 
 const FinancialStatements = ({ transactions }: Props) => {
-  const { format: fmtCurrency, convert } = useCurrency();
-  const fmt = (n: number) => fmtCurrency(Math.abs(n), "USD");
+  const { formatUGX } = useCurrency();
+  const fmt = (n: number) => formatUGX(Math.abs(n));
   const weekOptions = useMemo(getWeekOptions, []);
   const monthOptions = useMemo(getMonthOptions, []);
 
@@ -61,8 +61,8 @@ const FinancialStatements = ({ transactions }: Props) => {
     const filtered = filterByRange(transactions, balanceWeek);
     const assets = filtered.filter((t) => t.type === "asset");
     const liabilities = filtered.filter((t) => t.type === "liability");
-    const totalAssets = assets.reduce((s, t) => s + t.amount, 0);
-    const totalLiabilities = liabilities.reduce((s, t) => s + t.amount, 0);
+    const totalAssets = assets.reduce((s, t) => s + t.ugx_amount, 0);
+    const totalLiabilities = liabilities.reduce((s, t) => s + t.ugx_amount, 0);
     return { assets, liabilities, totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
   }, [transactions, balanceWeek]);
 
@@ -70,8 +70,8 @@ const FinancialStatements = ({ transactions }: Props) => {
     const filtered = filterByRange(transactions, incomeMonth);
     const income = filtered.filter((t) => t.type === "income");
     const expenses = filtered.filter((t) => t.type === "expense");
-    const totalIncome = income.reduce((s, t) => s + t.amount, 0);
-    const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
+    const totalIncome = income.reduce((s, t) => s + t.ugx_amount, 0);
+    const totalExpenses = expenses.reduce((s, t) => s + t.ugx_amount, 0);
     return { income, expenses, totalIncome, totalExpenses, profit: totalIncome - totalExpenses };
   }, [transactions, incomeMonth]);
 
@@ -80,8 +80,8 @@ const FinancialStatements = ({ transactions }: Props) => {
     const byCategory: Record<string, { inflow: number; outflow: number }> = {};
     filtered.forEach((t) => {
       if (!byCategory[t.category]) byCategory[t.category] = { inflow: 0, outflow: 0 };
-      if (t.type === "income") byCategory[t.category].inflow += t.amount;
-      else if (t.type === "expense") byCategory[t.category].outflow += t.amount;
+      if (t.type === "income") byCategory[t.category].inflow += t.ugx_amount;
+      else if (t.type === "expense") byCategory[t.category].outflow += t.ugx_amount;
     });
     return byCategory;
   }, [transactions, cashFlowWeek]);
@@ -122,7 +122,7 @@ const FinancialStatements = ({ transactions }: Props) => {
             {balanceSheet.assets.map((a) => (
               <div key={a.id} className="flex justify-between text-sm">
                 <span className="text-foreground">{a.description}</span>
-                <span className="text-foreground font-medium">{fmt(a.amount)}</span>
+                <span className="text-foreground font-medium">{fmt(a.ugx_amount)}</span>
               </div>
             ))}
             <div className="border-t border-border pt-2 flex justify-between text-sm font-bold">
@@ -136,7 +136,7 @@ const FinancialStatements = ({ transactions }: Props) => {
             {balanceSheet.liabilities.map((l) => (
               <div key={l.id} className="flex justify-between text-sm">
                 <span className="text-foreground">{l.description}</span>
-                <span className="text-foreground font-medium">{fmt(l.amount)}</span>
+                <span className="text-foreground font-medium">{fmt(l.ugx_amount)}</span>
               </div>
             ))}
             <div className="border-t border-border pt-2 flex justify-between text-sm font-bold">
@@ -163,7 +163,7 @@ const FinancialStatements = ({ transactions }: Props) => {
           {incomeStatement.income.map((i) => (
             <div key={i.id} className="flex justify-between text-sm">
               <span className="text-foreground">{i.description}</span>
-              <span className="text-foreground">{fmt(i.amount)}</span>
+              <span className="text-foreground">{fmt(i.ugx_amount)}</span>
             </div>
           ))}
           <div className="border-t border-border pt-2 flex justify-between text-sm font-bold text-primary">
@@ -176,7 +176,7 @@ const FinancialStatements = ({ transactions }: Props) => {
           {incomeStatement.expenses.map((e) => (
             <div key={e.id} className="flex justify-between text-sm">
               <span className="text-foreground">{e.description}</span>
-              <span className="text-foreground">{fmt(e.amount)}</span>
+              <span className="text-foreground">{fmt(e.ugx_amount)}</span>
             </div>
           ))}
           <div className="border-t border-border pt-2 flex justify-between text-sm font-bold text-destructive">
