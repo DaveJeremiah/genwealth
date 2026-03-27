@@ -79,7 +79,7 @@ const [latestInsight, setLatestInsight] = useState<string | null>(null);
         <TransactionInput onInsight={setLatestInsight} />
 
         {/* Tabs */}
-        <Tabs defaultValue="networth" className="space-y-4">
+        <Tabs defaultValue="networth" className="space-y-4" onValueChange={setActiveTab}>
           <TabsList className="bg-secondary border border-border">
             <TabsTrigger value="networth" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Net Worth</TabsTrigger>
             <TabsTrigger value="statements" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Statements</TabsTrigger>
@@ -104,8 +104,8 @@ const [latestInsight, setLatestInsight] = useState<string | null>(null);
           </TabsContent>
         </Tabs>
 
-        <AIChatAssistant />
       </main>
+      <AIChatAssistant currentScreen={activeTab} />
     </div>
   );
 };
