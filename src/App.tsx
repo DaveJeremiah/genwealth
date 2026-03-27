@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { OfflineProvider } from "@/contexts/OfflineContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -40,7 +41,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <CurrencyProvider>
-            <ProtectedRoutes />
+            <OfflineProvider>
+              <ProtectedRoutes />
+            </OfflineProvider>
           </CurrencyProvider>
         </AuthProvider>
       </BrowserRouter>

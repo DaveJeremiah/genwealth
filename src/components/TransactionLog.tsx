@@ -77,6 +77,8 @@ const TransactionLog = () => {
               <SelectItem value="expense">Expense</SelectItem>
               <SelectItem value="asset">Asset</SelectItem>
               <SelectItem value="liability">Liability</SelectItem>
+              <SelectItem value="transfer-in">Transfer In</SelectItem>
+              <SelectItem value="transfer-out">Transfer Out</SelectItem>
             </SelectContent>
           </Select>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -173,6 +175,8 @@ const TransactionLog = () => {
                             <SelectItem value="expense">Expense</SelectItem>
                             <SelectItem value="asset">Asset</SelectItem>
                             <SelectItem value="liability">Liability</SelectItem>
+                            <SelectItem value="transfer-in">Transfer In</SelectItem>
+                            <SelectItem value="transfer-out">Transfer Out</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
@@ -201,12 +205,12 @@ const TransactionLog = () => {
                       <td className="py-2.5 text-muted-foreground text-xs">
                         {t.currency !== "UGX" ? formatOriginal(t.amount, t.currency) : "—"}
                       </td>
-                      <td className={`py-2.5 font-medium ${t.type === "income" || t.type === "asset" ? "text-primary" : "text-destructive"}`}>
-                        {formatUGX(t.ugx_amount, { sign: t.type === "income" || t.type === "asset" })}
+                      <td className={`py-2.5 font-medium ${["income", "asset", "transfer-in"].includes(t.type) ? "text-primary" : t.type.startsWith("transfer") ? "text-muted-foreground" : "text-destructive"}`}>
+                        {formatUGX(t.ugx_amount, { sign: ["income", "asset", "transfer-in"].includes(t.type) })}
                       </td>
                       <td className="py-2.5 hidden sm:table-cell">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          t.type === "income" || t.type === "asset" ? "bg-primary/20 text-primary" : "bg-destructive/20 text-destructive"
+                          ["income", "asset", "transfer-in"].includes(t.type) ? "bg-primary/20 text-primary" : t.type.startsWith("transfer") ? "bg-muted text-muted-foreground" : "bg-destructive/20 text-destructive"
                         }`}>
                           {t.type}
                         </span>

@@ -61,7 +61,17 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a personal financial accountant based in Uganda. Parse the user's natural language input and return a JSON array of transactions. Each transaction must have: id (generate a random uuid string), date (use ${today} if not specified), description, amount (always positive number — the original amount in the original currency), currency (default to UGX if no currency is mentioned. Use standard 3-letter codes: UGX, USD, EUR, GBP, KES, etc. For crypto use: BTC, ETH, SOL, XRP, USDT, USDC, BNB, ADA, DOGE, DOT), type (income/expense/asset/liability), category (Housing/Food & Dining/Transport/Entertainment/Health/Shopping/Utilities/Investments/Crypto/Property/Salary/Freelance/Business/Savings/Other), account (Cash/Bank/Investment/Crypto/Property/Other). Also return a single 'insight' string — one sharp, direct observation about what was just entered and its implications for wealth building. Return only valid JSON in this exact format: {"transactions": [...], "insight": "..."}`
+            content: `You are a personal financial accountant based in Uganda. Parse the user's natural language input and return a JSON array of transactions. Each transaction must have: id (generate a random uuid string), date (use ${today} if not specified), description, amount (always positive number — the original amount in the original currency), currency (default to UGX if no currency is mentioned. Use standard 3-letter codes: UGX, USD, EUR, GBP, KES, etc. For crypto use: BTC, ETH, SOL, XRP, USDT, USDC, BNB, ADA, DOGE, DOT), type (income/expense/asset/liability/transfer-in/transfer-out), category (Housing/Food & Dining/Transport/Entertainment/Health/Shopping/Utilities/Investments/Crypto/Property/Salary/Freelance/Business/Savings/Transfer/Other), account (Cash/Bank/Mobile Money/Investment/Crypto/Property/Other).
+
+TRANSFER DETECTION RULES:
+- "transfer" is a valid type alongside income/expense/asset/liability.
+- A transfer is any movement of money between accounts the user owns — examples: mobile money withdrawal to cash, bank transfer to mobile money, moving funds between bank accounts, sending crypto between own wallets, withdrawing from an investment account to a bank account.
+- Identify transfers using these signals: words like "withdrew", "moved", "transferred", "sent to my", "topped up", "loaded", "shifted", "pulled out" — especially when both source and destination belong to the user.
+- For transfers, return TWO entries: one with type "transfer-out" (account = source) and one with type "transfer-in" (account = destination). Same amount, same date, opposite directions. Category should be "Transfer".
+- The insight for a transfer should note the movement without treating it as spending or earning.
+- Example: "withdrew 200,000 UGX from MoMo to cash" becomes two entries: {type: "transfer-out", account: "Mobile Money", amount: 200000} and {type: "transfer-in", account: "Cash", amount: 200000}.
+
+Also return a single 'insight' string — one sharp, direct observation about what was just entered and its implications for wealth building. Return only valid JSON in this exact format: {"transactions": [...], "insight": "..."}`
           },
           { role: "user", content: input }
         ],
@@ -84,7 +94,7 @@ serve(async (req) => {
                         description: { type: "string" },
                         amount: { type: "number" },
                         currency: { type: "string" },
-                        type: { type: "string", enum: ["income", "expense", "asset", "liability"] },
+                        type: { type: "string", enum: ["income", "expense", "asset", "liability", "transfer-in", "transfer-out"] },
                         category: { type: "string" },
                         account: { type: "string" }
                       },

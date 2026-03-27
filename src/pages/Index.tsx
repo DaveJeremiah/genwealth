@@ -14,6 +14,8 @@ import TransactionLog from "@/components/TransactionLog";
 import WealthAnalysis from "@/components/WealthAnalysis";
 import NetWorthTracker from "@/components/NetWorthTracker";
 import AIChatAssistant from "@/components/AIChatAssistant";
+import OfflineBanner from "@/components/OfflineBanner";
+import SyncIndicator from "@/components/SyncIndicator";
 
 const CURRENCY_OPTIONS = [
   { value: "UGX", label: "UGX (Shilling)" },
@@ -26,11 +28,12 @@ const Index = () => {
   const { signOut } = useAuth();
   const { displayCurrency, setDisplayCurrency } = useCurrency();
   const { data: transactions = [] } = useTransactions();
-const [latestInsight, setLatestInsight] = useState<string | null>(null);
+  const [latestInsight, setLatestInsight] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("networth");
 
   return (
     <div className="min-h-screen bg-background">
+      <OfflineBanner />
       {/* Header */}
       <header className="border-b border-border sticky top-0 z-50 bg-background/80 backdrop-blur-xl">
         <div className="container flex items-center justify-between h-14 px-4">
@@ -40,7 +43,8 @@ const [latestInsight, setLatestInsight] = useState<string | null>(null);
             </div>
             <span className="text-lg font-display font-bold gold-text">Wealth OS</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <SyncIndicator />
             <Select value={displayCurrency} onValueChange={(v) => setDisplayCurrency(v as any)}>
               <SelectTrigger className="w-[140px] h-8 bg-secondary border-border text-xs">
                 <SelectValue />
@@ -61,7 +65,6 @@ const [latestInsight, setLatestInsight] = useState<string | null>(null);
 
       {/* Main */}
       <main className="container px-4 py-6 space-y-6 max-w-6xl font-sans">
-        {/* AI Insight Banner */}
         {latestInsight && (
           <div className="rounded-xl p-4 border border-primary/30 bg-primary/5 flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -72,13 +75,9 @@ const [latestInsight, setLatestInsight] = useState<string | null>(null);
           </div>
         )}
 
-        {/* Stats */}
         <StatsCards transactions={transactions} />
-
-        {/* Input */}
         <TransactionInput onInsight={setLatestInsight} />
 
-        {/* Tabs */}
         <Tabs defaultValue="networth" className="space-y-4" onValueChange={setActiveTab}>
           <TabsList className="bg-secondary border border-border">
             <TabsTrigger value="networth" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Net Worth</TabsTrigger>
@@ -87,23 +86,12 @@ const [latestInsight, setLatestInsight] = useState<string | null>(null);
             <TabsTrigger value="analysis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Analysis</TabsTrigger>
             <TabsTrigger value="log" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Log</TabsTrigger>
           </TabsList>
-          <TabsContent value="networth">
-            <NetWorthTracker />
-          </TabsContent>
-          <TabsContent value="statements">
-            <FinancialStatements transactions={transactions} />
-          </TabsContent>
-          <TabsContent value="charts">
-            <Charts transactions={transactions} />
-          </TabsContent>
-          <TabsContent value="analysis">
-            <WealthAnalysis />
-          </TabsContent>
-          <TabsContent value="log">
-            <TransactionLog />
-          </TabsContent>
+          <TabsContent value="networth"><NetWorthTracker /></TabsContent>
+          <TabsContent value="statements"><FinancialStatements transactions={transactions} /></TabsContent>
+          <TabsContent value="charts"><Charts transactions={transactions} /></TabsContent>
+          <TabsContent value="analysis"><WealthAnalysis /></TabsContent>
+          <TabsContent value="log"><TransactionLog /></TabsContent>
         </Tabs>
-
       </main>
       <AIChatAssistant currentScreen={activeTab} />
     </div>
