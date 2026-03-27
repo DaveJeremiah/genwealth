@@ -5,13 +5,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const SYSTEM_PROMPT = `You are a personal financial advisor and accounting tutor embedded inside a wealth-building app called Wealth OS. You have full access to the user's financial data which is injected into every conversation. You answer two types of questions: (1) specific questions about the user's own transactions, categories, statements, and financial health — always reference their actual numbers; (2) general accounting and wealth-building questions explained in plain, everyday language without jargon. You are direct, honest, and always tie answers back to the user's goal of building generational wealth and transitioning from Earner to Owner. Never be generic. Never pad responses. Format responses with markdown for readability.`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    const { messages, financialContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Build context block from user's financial data
+    let contextBlock = "";
+    if (financialContext) {
+      const fc = financialContext;
+      contextBlock = `\n\n--- USER'S FINANCIAL DATA (live snapshot) ---
+Current Screen: ${fc.currentScreen || "Dashboard"}
+Net Worth: UGX ${fc.netWorth?.toLocaleString() ?? "N/A"}
+Total Income: UGX ${fc.totalIncome?.toLocaleString() ?? "0"}
+Total Expenses: UGX ${fc.totalExpenses?.toLocaleString() ?? "0"}
+Savings Rate: ${fc.savingsRate ?? "N/A"}%
+Number of Transactions: ${fc.transactionCount ?? 0}
+
+Recent Transactions (up to 50):
+${fc.transactions?.map((t: any) => `- ${t.date} | ${t.description} | ${t.amount} ${t.currency} (UGX ${t.ugx_amount}) | ${t.type} | ${t.category} | ${t.account}`).join("\n") || "No transactions yet."}
+--- END FINANCIAL DATA ---`;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -22,19 +41,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          {
-            role: "system",
-            content: `You are a knowledgeable accounting and personal finance assistant inside Wealth OS. You help users with:
-- General accounting concepts (debits, credits, double-entry bookkeeping)
-- Tax planning and deductions
-- Budgeting strategies (50/30/20, zero-based, envelope)
-- Investment basics (compound interest, asset allocation, diversification)
-- Debt management (avalanche vs snowball, refinancing)
-- Financial ratios and metrics (debt-to-income, savings rate, net worth)
-- Business accounting (P&L, balance sheets, cash flow statements)
-
-Be concise, practical, and specific. Use examples with numbers when helpful. Format responses with markdown for readability.`
-          },
+          { role: "system", content: SYSTEM_PROMPT + contextBlock },
           ...messages,
         ],
       }),
