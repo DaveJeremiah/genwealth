@@ -26,7 +26,8 @@ const Index = () => {
   const { signOut } = useAuth();
   const { displayCurrency, setDisplayCurrency } = useCurrency();
   const { data: transactions = [] } = useTransactions();
-  const [latestInsight, setLatestInsight] = useState<string | null>(null);
+const [latestInsight, setLatestInsight] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("networth");
 
   return (
     <div className="min-h-screen bg-background">
