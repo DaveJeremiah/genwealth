@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { offlineDb, type LocalTransaction } from "@/lib/offlineDb";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 export interface Transaction {
   id: string;
@@ -21,16 +23,26 @@ export const useTransactions = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
 
   const query = useQuery({
     queryKey: ["transactions", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .order("date", { ascending: false });
-      if (error) throw error;
-      return data as unknown as Transaction[];
+      if (isOnline) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("*")
+          .order("date", { ascending: false });
+        if (error) throw error;
+        return data as unknown as Transaction[];
+      }
+      // Offline: read from IndexedDB
+      const local = await offlineDb.transactions
+        .where("user_id")
+        .equals(user!.id)
+        .toArray();
+      local.sort((a, b) => b.date.localeCompare(a.date));
+      return local as unknown as Transaction[];
     },
     enabled: !!user,
   });
@@ -48,8 +60,30 @@ export const useTransactions = () => {
         category: t.category,
         account: t.account,
       }));
-      const { error } = await supabase.from("transactions").insert(rows);
-      if (error) throw error;
+
+      if (isOnline) {
+        const { error } = await supabase.from("transactions").insert(rows);
+        if (error) throw error;
+        // Also save to IndexedDB
+        for (const r of rows) {
+          await offlineDb.transactions.put({
+            id: crypto.randomUUID(),
+            ...r,
+            created_at: new Date().toISOString(),
+            synced: true,
+          } as LocalTransaction);
+        }
+      } else {
+        // Offline: save to IndexedDB only
+        for (const r of rows) {
+          await offlineDb.transactions.put({
+            id: crypto.randomUUID(),
+            ...r,
+            created_at: new Date().toISOString(),
+            synced: false,
+          } as LocalTransaction);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -62,8 +96,12 @@ export const useTransactions = () => {
   const updateTransaction = useMutation({
     mutationFn: async (updates: { id: string } & Partial<Omit<Transaction, "id" | "user_id" | "created_at">>) => {
       const { id, ...fields } = updates;
-      const { error } = await supabase.from("transactions").update(fields).eq("id", id);
-      if (error) throw error;
+      if (isOnline) {
+        const { error } = await supabase.from("transactions").update(fields).eq("id", id);
+        if (error) throw error;
+      }
+      // Always update local
+      await offlineDb.transactions.update(id, { ...fields, synced: isOnline });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -76,8 +114,11 @@ export const useTransactions = () => {
 
   const deleteTransaction = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
-      if (error) throw error;
+      if (isOnline) {
+        const { error } = await supabase.from("transactions").delete().eq("id", id);
+        if (error) throw error;
+      }
+      await offlineDb.transactions.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
