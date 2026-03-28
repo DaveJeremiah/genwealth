@@ -1,7 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, Loader2, Mic, MicOff, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,9 +18,7 @@ const CATEGORIES = [
   "Shopping", "Utilities", "Investments", "Crypto", "Property",
   "Salary", "Freelance", "Business", "Savings", "Transfer", "Other",
 ];
-
 const CURRENCIES = ["UGX", "USD", "EUR", "GBP", "KES", "BTC", "ETH", "SOL"];
-
 const TYPES = ["income", "expense", "asset", "liability", "transfer-in", "transfer-out"];
 
 const TransactionInput = ({ onInsight }: TransactionInputProps) => {
@@ -42,14 +38,12 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
   const [offType, setOffType] = useState("expense");
   const [offCategory, setOffCategory] = useState("Other");
   const [offDate, setOffDate] = useState(() => new Date().toISOString().split("T")[0]);
-
-  // Memo state
   const [memoText, setMemoText] = useState("");
 
   const toggleListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast({ title: "Not supported", description: "Speech recognition is not available in this browser.", variant: "destructive" });
+      toast({ title: "Not supported", description: "Speech recognition is not available.", variant: "destructive" });
       return;
     }
     if (listening) {
@@ -110,7 +104,6 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     if (!offDesc.trim() || !offAmount || !user) return;
     const amt = parseFloat(offAmount);
     if (isNaN(amt) || amt <= 0) return;
-
     const tx: LocalTransaction = {
       id: crypto.randomUUID(),
       user_id: user.id,
@@ -118,7 +111,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
       description: offDesc.trim(),
       amount: amt,
       currency: offCurrency,
-      ugx_amount: offCurrency === "UGX" ? amt : amt, // best effort offline
+      ugx_amount: offCurrency === "UGX" ? amt : amt,
       type: offType,
       category: offCategory,
       account: "Cash",
@@ -128,10 +121,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     await offlineDb.transactions.put(tx);
     await refreshPendingCount();
     toast({ title: "Saved locally", description: "Will sync when you're back online." });
-    setOffDesc("");
-    setOffAmount("");
-    setOffType("expense");
-    setOffCategory("Other");
+    setOffDesc(""); setOffAmount(""); setOffType("expense"); setOffCategory("Other");
     setOffDate(new Date().toISOString().split("T")[0]);
   };
 
@@ -150,43 +140,37 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     setMemoText("");
   };
 
-  // ONLINE MODE
+  // ONLINE MODE — hero pill input
   if (isOnline) {
     return (
-      <div className="glass-card rounded-xl p-5 space-y-3">
-        <h3 className="text-lg font-semibold text-foreground font-mono">Log Transactions</h3>
-        <p className="text-xs text-muted-foreground">
-          Describe your financial activity in plain language — type or use the mic
-        </p>
-        <div className="relative">
-          <Textarea
-            placeholder={`"Paid $1,200 rent, got $3,500 salary, spent $45 groceries"`}
+      <div className="relative">
+        <div
+          className="flex items-center rounded-full bg-card border transition-all duration-200 focus-within:border-primary/60"
+          style={{ borderWidth: '0.5px', borderColor: 'hsl(263, 83%, 58%, 0.27)' }}
+        >
+          <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="bg-secondary border-border text-foreground placeholder:text-muted-foreground min-h-[80px] resize-none pr-12"
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleOnlineSubmit(); }}
+            placeholder="What happened financially today?"
+            className="flex-1 bg-transparent px-5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body"
+            onKeyDown={(e) => { if (e.key === "Enter") handleOnlineSubmit(); }}
           />
-          <button
-            type="button"
-            onClick={toggleListening}
-            className={`absolute right-3 top-3 p-1.5 rounded-full transition-colors ${listening ? "bg-destructive/20 text-destructive animate-pulse" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}`}
-            title={listening ? "Stop listening" : "Voice input"}
-          >
-            {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-        </div>
-        <div className="flex items-center justify-between">
-          {listening && (
-            <span className="text-xs text-destructive flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-              Listening…
-            </span>
+          {loading ? (
+            <div className="mr-2 p-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            </div>
+          ) : (
+            <button
+              onClick={input.trim() ? handleOnlineSubmit : toggleListening}
+              className={`mr-1.5 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                listening
+                  ? "bg-destructive/20 text-destructive animate-pulse"
+                  : "bg-primary text-primary-foreground hover:bg-violet-hover"
+              }`}
+            >
+              {listening ? <MicOff className="w-4 h-4" /> : input.trim() ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
           )}
-          <div className="flex-1" />
-          <Button onClick={handleOnlineSubmit} disabled={loading || !input.trim()} className="gold-gradient text-primary-foreground font-semibold gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {loading ? "Parsing..." : "Process"}
-          </Button>
         </div>
       </div>
     );
@@ -195,62 +179,64 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
   // OFFLINE MODE
   return (
     <div className="space-y-4">
-      {/* Quick form */}
-      <div className="glass-card rounded-xl p-5 space-y-3">
-        <h3 className="text-lg font-semibold text-foreground font-mono">Quick Entry (Offline)</h3>
+      <div className="glass-card rounded-2xl p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Quick Entry (Offline)</h3>
         <p className="text-xs text-muted-foreground">Add transactions manually — they'll sync when you reconnect.</p>
         <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Description" value={offDesc} onChange={(e) => setOffDesc(e.target.value)} className="col-span-2 bg-secondary border-border" />
-          <Input type="number" placeholder="Amount" value={offAmount} onChange={(e) => setOffAmount(e.target.value)} className="bg-secondary border-border" />
+          <Input placeholder="Description" value={offDesc} onChange={(e) => setOffDesc(e.target.value)} className="col-span-2 bg-card border-border rounded-xl" />
+          <Input type="number" placeholder="Amount" value={offAmount} onChange={(e) => setOffAmount(e.target.value)} className="bg-card border-border rounded-xl" />
           <Select value={offCurrency} onValueChange={setOffCurrency}>
-            <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-            <SelectContent className="bg-popover border-border">
-              {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
+            <SelectTrigger className="bg-card border-border rounded-xl"><SelectValue /></SelectTrigger>
+            <SelectContent className="bg-popover border-border">{CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={offType} onValueChange={setOffType}>
-            <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-            <SelectContent className="bg-popover border-border">
-              {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
+            <SelectTrigger className="bg-card border-border rounded-xl"><SelectValue /></SelectTrigger>
+            <SelectContent className="bg-popover border-border">{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={offCategory} onValueChange={setOffCategory}>
-            <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
-            <SelectContent className="bg-popover border-border">
-              {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
+            <SelectTrigger className="bg-card border-border rounded-xl"><SelectValue /></SelectTrigger>
+            <SelectContent className="bg-popover border-border">{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="date" value={offDate} onChange={(e) => setOffDate(e.target.value)} className="bg-secondary border-border" />
+          <Input type="date" value={offDate} onChange={(e) => setOffDate(e.target.value)} className="bg-card border-border rounded-xl" />
         </div>
-        <Button onClick={handleOfflineQuickSubmit} disabled={!offDesc.trim() || !offAmount} className="gold-gradient text-primary-foreground font-semibold gap-2 w-full">
-          <Send className="w-4 h-4" /> Save Locally
-        </Button>
+        <button
+          onClick={handleOfflineQuickSubmit}
+          disabled={!offDesc.trim() || !offAmount}
+          className="w-full py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-40 transition-opacity"
+        >
+          Save Locally
+        </button>
       </div>
 
-      {/* Memo queue */}
-      <div className="glass-card rounded-xl p-5 space-y-3">
+      <div className="glass-card rounded-2xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground font-mono">Or save a voice/text memo to process later</h3>
+          <h3 className="text-xs font-semibold text-foreground">Or save a voice/text memo to process later</h3>
         </div>
         <div className="relative">
-          <Textarea
+          <textarea
             placeholder="Describe transactions naturally — AI will parse them when you reconnect."
             value={memoText}
             onChange={(e) => setMemoText(e.target.value)}
-            className="bg-secondary border-border text-foreground placeholder:text-muted-foreground min-h-[60px] resize-none pr-12"
+            className="w-full bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground min-h-[60px] resize-none p-3 text-sm pr-12 focus:outline-none focus:border-primary/40"
+            style={{ borderWidth: '0.5px' }}
           />
           <button
             type="button"
             onClick={toggleListening}
-            className={`absolute right-3 top-3 p-1.5 rounded-full transition-colors ${listening ? "bg-destructive/20 text-destructive animate-pulse" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}`}
+            className={`absolute right-3 top-3 p-1.5 rounded-full transition-colors ${listening ? "bg-destructive/20 text-destructive animate-pulse" : "text-muted-foreground hover:text-primary"}`}
           >
             {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
         </div>
-        <Button onClick={handleMemoSubmit} disabled={!memoText.trim()} variant="outline" className="w-full gap-2 border-border">
-          <FileText className="w-4 h-4" /> Save Memo
-        </Button>
+        <button
+          onClick={handleMemoSubmit}
+          disabled={!memoText.trim()}
+          className="w-full py-2.5 rounded-full border border-border text-foreground text-sm font-medium disabled:opacity-40 transition-opacity hover:bg-card"
+          style={{ borderWidth: '0.5px' }}
+        >
+          Save Memo
+        </button>
       </div>
     </div>
   );

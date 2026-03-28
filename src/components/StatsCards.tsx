@@ -1,53 +1,57 @@
-import { useMemo } from "react";
-import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { TrendingUp, TrendingDown, DollarSign, PiggyBank } from "lucide-react";
 
 interface StatsCardsProps {
-  transactions: Transaction[];
+  netWorth: number;
+  cashFlow: number;
+  savingsRate: number;
+  wealthScore: number;
+  wealthLabel: string;
 }
 
-const StatsCards = ({ transactions }: StatsCardsProps) => {
-  const { formatUGX } = useCurrency();
+const StatsCards = ({ netWorth, cashFlow, savingsRate, wealthScore, wealthLabel }: StatsCardsProps) => {
+  const { formatUGX, displayCurrency, convertFromUGX } = useCurrency();
 
-  const stats = useMemo(() => {
-    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
-    const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
-    const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.ugx_amount, 0);
-    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.ugx_amount, 0);
-    const netWorth = assets - liabilities;
-    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
-    return { income, expenses, netWorth, savingsRate };
-  }, [transactions]);
-
-  const cards = [
-    { label: "Net Worth", value: stats.netWorth, icon: DollarSign, highlight: true },
-    { label: "Total Income", value: stats.income, icon: TrendingUp },
-    { label: "Total Expenses", value: stats.expenses, icon: TrendingDown },
-    { label: "Savings Rate", value: stats.savingsRate, icon: PiggyBank, suffix: "%" },
-  ];
-
-  const fmt = (n: number, suffix?: string) =>
-    suffix ? `${n.toFixed(1)}${suffix}` : formatUGX(n);
+  const usdEquiv = displayCurrency === "UGX"
+    ? `≈ $${Math.round(netWorth / 3750).toLocaleString()} USD`
+    : "";
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((c) => (
-        <div
-          key={c.label}
-          className={`rounded-xl p-5 space-y-2 ${c.highlight ? "gold-gradient" : "glass-card"}`}
-        >
-          <div className="flex items-center gap-2">
-            <c.icon className={`w-4 h-4 ${c.highlight ? "text-primary-foreground" : "text-primary"}`} />
-            <span className={`text-xs font-body font-medium ${c.highlight ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-              {c.label}
-            </span>
-          </div>
-          <p className={`text-2xl font-display font-bold ${c.highlight ? "text-primary-foreground" : "text-foreground"}`}>
-            {fmt(c.value, c.suffix)}
-          </p>
-        </div>
-      ))}
+    <div className="grid grid-cols-2 gap-3">
+      {/* Net Worth */}
+      <div className="glass-card rounded-2xl p-4 space-y-1">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Net Worth</p>
+        <p className="text-xl font-display font-bold text-violet-hover animate-count-up">
+          {formatUGX(netWorth)}
+        </p>
+        {usdEquiv && <p className="text-[10px] text-muted-foreground">{usdEquiv}</p>}
+      </div>
+
+      {/* Cash Flow */}
+      <div className="glass-card rounded-2xl p-4 space-y-1">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Cash Flow</p>
+        <p className={`text-xl font-display font-bold animate-count-up ${cashFlow >= 0 ? "text-success" : "text-destructive"}`}>
+          {cashFlow >= 0 ? "+" : ""}{formatUGX(cashFlow)}
+        </p>
+        <p className="text-[10px] text-muted-foreground">this month</p>
+      </div>
+
+      {/* Savings Rate */}
+      <div className="glass-card rounded-2xl p-4 space-y-1">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Savings Rate</p>
+        <p className="text-xl font-display font-bold text-foreground animate-count-up">
+          {savingsRate}%
+        </p>
+        <p className="text-[10px] text-muted-foreground">of income</p>
+      </div>
+
+      {/* Wealth Score */}
+      <div className="glass-card rounded-2xl p-4 space-y-1">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Wealth Score</p>
+        <p className="text-xl font-display font-bold text-violet-hover animate-count-up">
+          {wealthScore}
+        </p>
+        <p className="text-[10px] text-muted-foreground">{wealthLabel}</p>
+      </div>
     </div>
   );
 };

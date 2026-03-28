@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Brain, Loader2, Target, TrendingUp, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface AnalysisResult {
   wealthScore: number;
@@ -35,7 +35,6 @@ const WealthAnalysis = () => {
       if (data.error) throw new Error(data.error);
       setResult(data);
 
-      // Save net worth snapshot using ugx_amount
       const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.ugx_amount, 0);
       const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.ugx_amount, 0);
       await supabase.from("net_worth_snapshots").insert({
@@ -52,78 +51,57 @@ const WealthAnalysis = () => {
     }
   };
 
-  const scoreColor = (score: number) => {
-    if (score >= 70) return "text-primary";
-    if (score >= 40) return "text-yellow-500";
-    return "text-destructive";
-  };
+  if (!result) {
+    return (
+      <div className="glass-card rounded-2xl p-6 border border-primary/20 text-center space-y-4" style={{ borderWidth: '0.5px' }}>
+        <p className="text-sm text-muted-foreground">
+          {transactions.length === 0
+            ? "Add transactions to unlock your wealth analysis."
+            : "Ready to see the full picture?"}
+        </p>
+        <button
+          onClick={runAnalysis}
+          disabled={loading || transactions.length === 0}
+          className="px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-40 transition-all hover:bg-violet-hover inline-flex items-center gap-2"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {loading ? "Analyzing..." : "Run wealth analysis"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-lg font-semibold">AI Wealth Analysis</h3>
-        <Button
-          onClick={runAnalysis}
-          disabled={loading || transactions.length === 0}
-          className="gold-gradient text-primary-foreground font-semibold gap-2"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
-          {loading ? "Analyzing..." : "Analyze"}
-        </Button>
+      <div className="glass-card rounded-2xl p-6 text-center space-y-2">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Wealth Score</p>
+        <p className="text-5xl font-display font-bold text-violet-hover">{result.wealthScore}</p>
+        <p className="text-sm font-medium text-foreground">{result.earnerOrOwner}</p>
       </div>
 
-      {result && (
-        <div className="space-y-4">
-          <div className="glass-card rounded-xl p-6 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">Wealth Score</p>
-            <p className={`text-6xl font-display font-bold ${scoreColor(result.wealthScore)}`}>
-              {result.wealthScore}
-            </p>
-            <p className="text-sm text-muted-foreground">out of 100</p>
-          </div>
+      <div className="glass-card rounded-2xl p-5 space-y-3">
+        {result.insights.map((insight, i) => (
+          <p key={i} className="text-sm leading-relaxed" style={{ color: '#999', lineHeight: 1.7 }}>
+            {i + 1}. {insight}
+          </p>
+        ))}
+      </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="glass-card rounded-xl p-5 space-y-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-primary" />
-                <h4 className="font-display font-semibold text-sm">Status</h4>
-              </div>
-              <p className={`text-xl font-display font-bold ${
-                result.earnerOrOwner === "Owner" ? "text-primary" :
-                result.earnerOrOwner === "Transitioning" ? "text-yellow-500" : "text-muted-foreground"
-              }`}>
-                {result.earnerOrOwner}
-              </p>
-            </div>
-            <div className="glass-card rounded-xl p-5 space-y-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                <h4 className="font-display font-semibold text-sm">Lifestyle or Legacy?</h4>
-              </div>
-              <p className="text-sm text-foreground">{result.lifestyleOrLegacy}</p>
-            </div>
-          </div>
+      <div className="glass-card rounded-2xl p-5">
+        <p className="text-sm italic leading-relaxed" style={{ color: '#999', lineHeight: 1.7 }}>
+          {result.summary}
+        </p>
+      </div>
 
-          <div className="glass-card rounded-xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-primary" />
-              <h4 className="font-display font-semibold text-sm">Insights</h4>
-            </div>
-            <ul className="space-y-2">
-              {result.insights.map((insight, i) => (
-                <li key={i} className="text-sm text-foreground flex gap-2">
-                  <span className="text-primary font-bold shrink-0">{i + 1}.</span>
-                  {insight}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="glass-card rounded-xl p-5">
-            <p className="text-sm text-foreground italic">{result.summary}</p>
-          </div>
-        </div>
-      )}
+      <div className="text-center">
+        <button
+          onClick={runAnalysis}
+          disabled={loading}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {loading ? "Analyzing..." : "Re-analyze"}
+        </button>
+      </div>
     </div>
   );
 };

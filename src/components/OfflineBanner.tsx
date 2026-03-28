@@ -7,10 +7,10 @@ const OfflineBanner = () => {
   if (isOnline) return null;
 
   return (
-    <div className="bg-accent/15 border-b border-accent/30 px-4 py-2 flex items-center justify-center gap-2">
-      <WifiOff className="w-4 h-4 text-accent" />
-      <span className="text-xs text-accent font-medium">
-        You're offline. Data saves locally and syncs when you reconnect.
+    <div className="bg-amber-500/10 px-4 py-2 flex items-center justify-center gap-2">
+      <WifiOff className="w-3.5 h-3.5 text-amber-500" />
+      <span className="text-xs text-amber-500 font-medium">
+        You're offline. Entries save locally and sync when you reconnect.
       </span>
     </div>
   );
