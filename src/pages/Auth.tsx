@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp } from "lucide-react";
@@ -31,31 +30,31 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 font-body">
+      <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-lg gold-gradient flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl violet-gradient flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-display font-bold gold-text">Wealth OS</h1>
+            <h1 className="text-3xl font-display font-bold violet-text">Wealth OS</h1>
           </div>
-          <p className="text-muted-foreground font-body text-sm">
+          <p className="text-sm" style={{ color: '#999' }}>
             Income is not wealth. Ownership is.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-card rounded-xl p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 space-y-5">
           <h2 className="text-xl font-display font-semibold text-foreground text-center">
             {isLogin ? "Welcome back" : "Create your account"}
           </h2>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Input
               type="email"
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+              className="bg-card border-border text-foreground placeholder:text-muted-foreground rounded-xl"
               required
             />
             <Input
@@ -63,14 +62,18 @@ const Auth = () => {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+              className="bg-card border-border text-foreground placeholder:text-muted-foreground rounded-xl"
               required
               minLength={6}
             />
           </div>
-          <Button type="submit" className="w-full gold-gradient text-primary-foreground font-semibold" disabled={loading}>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-50 transition-all hover:bg-violet-hover"
+          >
             {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
-          </Button>
+          </button>
           <p className="text-center text-sm text-muted-foreground">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-primary hover:underline">

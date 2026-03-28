@@ -1,148 +1,122 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  LineChart, Line, Legend,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart,
 } from "recharts";
 
 interface Props {
   transactions: Transaction[];
 }
 
-const COLORS = [
-  "hsl(43, 60%, 53%)", "hsl(43, 40%, 35%)", "hsl(200, 50%, 45%)",
-  "hsl(160, 45%, 40%)", "hsl(280, 40%, 50%)", "hsl(0, 50%, 50%)",
-  "hsl(30, 55%, 50%)", "hsl(210, 45%, 55%)", "hsl(120, 35%, 45%)",
-];
-
 const Charts = ({ transactions }: Props) => {
   const { convertFromUGX, formatUGX, displayCurrency } = useCurrency();
-
-  const spendingByCategory = useMemo(() => {
-    const map: Record<string, number> = {};
-    transactions.filter((t) => t.type === "expense").forEach((t) => {
-      map[t.category] = (map[t.category] || 0) + t.ugx_amount;
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value: convertFromUGX(value) }));
-  }, [transactions, convertFromUGX]);
-
-  const incomeVsExpensesByMonth = useMemo(() => {
-    const map: Record<string, { income: number; expenses: number }> = {};
-    transactions.forEach((t) => {
-      const month = t.date.substring(0, 7);
-      if (!map[month]) map[month] = { income: 0, expenses: 0 };
-      if (t.type === "income") map[month].income += t.ugx_amount;
-      else if (t.type === "expense") map[month].expenses += t.ugx_amount;
-    });
-    return Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, data]) => ({
-        month,
-        income: convertFromUGX(data.income),
-        expenses: convertFromUGX(data.expenses),
-      }));
-  }, [transactions, convertFromUGX]);
-
-  const assetAllocation = useMemo(() => {
-    const map: Record<string, number> = {};
-    transactions.filter((t) => t.type === "asset").forEach((t) => {
-      map[t.account] = (map[t.account] || 0) + t.ugx_amount;
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value: convertFromUGX(value) }));
-  }, [transactions, convertFromUGX]);
+  const [range, setRange] = useState<"1W" | "1M" | "3M" | "All">("3M");
 
   const netWorthOverTime = useMemo(() => {
     const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
     let netWorth = 0;
     const points: { date: string; netWorth: number }[] = [];
     sorted.forEach((t) => {
-      if (t.type === "asset" || t.type === "income") netWorth += t.ugx_amount;
+      if (t.type === "asset" || t.type === "income" || t.type === "transfer-in") netWorth += t.ugx_amount;
+      else if (t.type !== "transfer-out") netWorth -= t.ugx_amount;
       else netWorth -= t.ugx_amount;
       points.push({ date: t.date, netWorth: convertFromUGX(netWorth) });
     });
     return points;
   }, [transactions, convertFromUGX]);
 
-  const fmtValue = (v: number) => formatUGX(v);
+  const filteredData = useMemo(() => {
+    if (range === "All" || netWorthOverTime.length === 0) return netWorthOverTime;
+    const now = new Date();
+    const cutoff = new Date();
+    if (range === "1W") cutoff.setDate(now.getDate() - 7);
+    else if (range === "1M") cutoff.setMonth(now.getMonth() - 1);
+    else if (range === "3M") cutoff.setMonth(now.getMonth() - 3);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    return netWorthOverTime.filter((p) => p.date >= cutoffStr);
+  }, [netWorthOverTime, range]);
 
-  const tooltipStyle = {
-    contentStyle: { background: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 15%, 18%)", borderRadius: 8, color: "hsl(40, 20%, 90%)" },
-    labelStyle: { color: "hsl(40, 20%, 90%)" },
-  };
+  const currentNetWorth = filteredData.length > 0 ? filteredData[filteredData.length - 1].netWorth : 0;
 
   if (transactions.length === 0) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center text-muted-foreground">
-        <p className="font-display text-lg">No data yet</p>
-        <p className="text-sm mt-1">Add transactions to see charts</p>
+      <div className="glass-card rounded-2xl p-8 text-center">
+        <p className="text-sm text-muted-foreground">Add transactions to see your net worth chart</p>
       </div>
     );
   }
 
+  const ranges: ("1W" | "1M" | "3M" | "All")[] = ["1W", "1M", "3M", "All"];
+
   return (
-    <div className="grid md:grid-cols-2 gap-4">
-      {spendingByCategory.length > 0 && (
-        <div className="glass-card rounded-xl p-5 space-y-3">
-          <h3 className="font-display text-base font-semibold">Spending Breakdown</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={spendingByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} strokeWidth={0}>
-                {spendingByCategory.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} />))}
-              </Pie>
-              <Tooltip {...tooltipStyle} formatter={(v: number) => fmtValue(v)} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "hsl(220, 10%, 50%)" }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+    <div className="glass-card rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Net Worth Over Time</h3>
+        <span className="text-sm font-display font-bold text-foreground">
+          {formatUGX(currentNetWorth / (convertFromUGX(1) || 1))}
+        </span>
+      </div>
 
-      {incomeVsExpensesByMonth.length > 0 && (
-        <div className="glass-card rounded-xl p-5 space-y-3">
-          <h3 className="font-display text-base font-semibold">Income vs Expenses</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={incomeVsExpensesByMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 18%)" />
-              <XAxis dataKey="month" tick={{ fill: "hsl(220, 10%, 50%)", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(220, 10%, 50%)", fontSize: 11 }} />
-              <Tooltip {...tooltipStyle} formatter={(v: number) => fmtValue(v)} />
-              <Bar dataKey="income" fill="hsl(43, 60%, 53%)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expenses" fill="hsl(0, 50%, 50%)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      {/* Range pills */}
+      <div className="flex gap-2">
+        {ranges.map((r) => (
+          <button
+            key={r}
+            onClick={() => setRange(r)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              range === r
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground border border-border hover:text-foreground"
+            }`}
+            style={range !== r ? { borderWidth: '0.5px' } : {}}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
 
-      {assetAllocation.length > 0 && (
-        <div className="glass-card rounded-xl p-5 space-y-3">
-          <h3 className="font-display text-base font-semibold">Asset Allocation</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={assetAllocation} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} strokeWidth={0}>
-                {assetAllocation.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} />))}
-              </Pie>
-              <Tooltip {...tooltipStyle} formatter={(v: number) => fmtValue(v)} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "hsl(220, 10%, 50%)" }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {netWorthOverTime.length > 1 && (
-        <div className="glass-card rounded-xl p-5 space-y-3">
-          <h3 className="font-display text-base font-semibold">Net Worth Over Time</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={netWorthOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 18%)" />
-              <XAxis dataKey="date" tick={{ fill: "hsl(220, 10%, 50%)", fontSize: 11 }} />
-              <YAxis tick={{ fill: "hsl(220, 10%, 50%)", fontSize: 11 }} />
-              <Tooltip {...tooltipStyle} formatter={(v: number) => fmtValue(v)} />
-              <Line type="monotone" dataKey="netWorth" stroke="hsl(43, 60%, 53%)" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      {/* Chart */}
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={filteredData}>
+          <defs>
+            <linearGradient id="violetGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(263, 83%, 58%)" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="hsl(263, 83%, 58%)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="date"
+            tick={{ fill: '#555', fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => {
+              const d = new Date(v);
+              return d.toLocaleDateString("en-US", { month: "short" });
+            }}
+          />
+          <YAxis hide />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(0, 0%, 9%)",
+              border: "0.5px solid hsl(0, 0%, 12%)",
+              borderRadius: 12,
+              color: "hsl(40, 24%, 92%)",
+              fontSize: 12,
+            }}
+            formatter={(v: number) => [formatUGX(v / (convertFromUGX(1) || 1)), "Net Worth"]}
+          />
+          <Area
+            type="monotone"
+            dataKey="netWorth"
+            stroke="hsl(263, 83%, 58%)"
+            strokeWidth={2}
+            fill="url(#violetGradient)"
+            dot={false}
+            activeDot={{ fill: "white", stroke: "hsl(263, 83%, 58%)", strokeWidth: 2, r: 4 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 };
