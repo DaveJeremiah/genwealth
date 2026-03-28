@@ -1,99 +1,113 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useTransactions } from "@/hooks/useTransactions";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, LogOut, Sparkles } from "lucide-react";
-import TransactionInput from "@/components/TransactionInput";
-import StatsCards from "@/components/StatsCards";
-import FinancialStatements from "@/components/FinancialStatements";
-import Charts from "@/components/Charts";
-import TransactionLog from "@/components/TransactionLog";
-import WealthAnalysis from "@/components/WealthAnalysis";
-import NetWorthTracker from "@/components/NetWorthTracker";
-import AIChatAssistant from "@/components/AIChatAssistant";
+import { useOffline } from "@/contexts/OfflineContext";
+import { Home, Activity, LogOut } from "lucide-react";
 import OfflineBanner from "@/components/OfflineBanner";
 import SyncIndicator from "@/components/SyncIndicator";
-
-const CURRENCY_OPTIONS = [
-  { value: "UGX", label: "UGX (Shilling)" },
-  { value: "USD", label: "USD ($)" },
-  { value: "KES", label: "KES (Shilling)" },
-  { value: "EUR", label: "EUR (€)" },
-] as const;
+import HomeTab from "@/components/HomeTab";
+import PulseTab from "@/components/PulseTab";
+import AIChatAssistant from "@/components/AIChatAssistant";
 
 const Index = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { displayCurrency, setDisplayCurrency } = useCurrency();
   const { data: transactions = [] } = useTransactions();
+  const { isOnline, syncStatus, pendingCount } = useOffline();
+  const [activeTab, setActiveTab] = useState<"home" | "pulse">("home");
   const [latestInsight, setLatestInsight] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("networth");
+
+  const firstName = user?.email?.split("@")[0] || "there";
+  const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+
+  const stats = useMemo(() => {
+    const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
+    const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
+    const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.ugx_amount, 0);
+    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.ugx_amount, 0);
+    const netWorth = assets - liabilities + income - expenses;
+    const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
+    return { income, expenses, netWorth, savingsRate, assets, liabilities };
+  }, [transactions]);
+
+  // Sync indicator dot color
+  const dotColor = !isOnline ? "bg-muted-foreground" : pendingCount > 0 ? "bg-amber-500" : "bg-success";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background font-body">
       <OfflineBanner />
-      {/* Header */}
-      <header className="border-b border-border sticky top-0 z-50 bg-background/80 backdrop-blur-xl">
-        <div className="container flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg gold-gradient flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-display font-bold gold-text">Wealth OS</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <SyncIndicator />
-            <Select value={displayCurrency} onValueChange={(v) => setDisplayCurrency(v as any)}>
-              <SelectTrigger className="w-[140px] h-8 bg-secondary border-border text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
-                {CURRENCY_OPTIONS.map((c) => (
-                  <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground gap-1.5">
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
+
+      {/* Minimal top header */}
+      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Currency toggle pill */}
+          <div className="flex items-center bg-card rounded-full border border-border p-0.5">
+            {(["UGX", "USD"] as const).map((c) => (
+              <button
+                key={c}
+                onClick={() => setDisplayCurrency(c)}
+                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                  displayCurrency === c
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="container px-4 py-6 space-y-6 max-w-6xl font-sans">
-        {latestInsight && (
-          <div className="rounded-xl p-4 border border-primary/30 bg-primary/5 flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-primary font-semibold mb-1">Latest AI Insight</p>
-              <p className="text-sm text-foreground">{latestInsight}</p>
-            </div>
-          </div>
+      {/* Main content */}
+      <main className="pb-24 max-w-lg mx-auto px-4">
+        {activeTab === "home" ? (
+          <HomeTab
+            transactions={transactions}
+            stats={stats}
+            displayName={displayName}
+            latestInsight={latestInsight}
+            onInsight={setLatestInsight}
+          />
+        ) : (
+          <PulseTab transactions={transactions} stats={stats} />
         )}
-
-        <StatsCards transactions={transactions} />
-        <TransactionInput onInsight={setLatestInsight} />
-
-        <Tabs defaultValue="networth" className="space-y-4" onValueChange={setActiveTab}>
-          <TabsList className="bg-secondary border border-border">
-            <TabsTrigger value="networth" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Net Worth</TabsTrigger>
-            <TabsTrigger value="statements" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Statements</TabsTrigger>
-            <TabsTrigger value="charts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Charts</TabsTrigger>
-            <TabsTrigger value="analysis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Analysis</TabsTrigger>
-            <TabsTrigger value="log" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs">Log</TabsTrigger>
-          </TabsList>
-          <TabsContent value="networth"><NetWorthTracker /></TabsContent>
-          <TabsContent value="statements"><FinancialStatements transactions={transactions} /></TabsContent>
-          <TabsContent value="charts"><Charts transactions={transactions} /></TabsContent>
-          <TabsContent value="analysis"><WealthAnalysis /></TabsContent>
-          <TabsContent value="log"><TransactionLog /></TabsContent>
-        </Tabs>
       </main>
+
+      {/* AI Chat FAB */}
       <AIChatAssistant currentScreen={activeTab} />
+
+      {/* Bottom tab bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[hsl(0,0%,5%)] border-t border-[hsl(0,0%,10%)]" style={{ borderTopWidth: '0.5px' }}>
+        <div className="max-w-lg mx-auto flex items-center justify-around py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+          <button
+            onClick={() => setActiveTab("home")}
+            className="flex flex-col items-center gap-1 py-1 px-6 transition-colors"
+          >
+            <div className={`p-1.5 rounded-full transition-all ${activeTab === "home" ? "bg-primary/20" : ""}`}>
+              <Home className={`w-5 h-5 ${activeTab === "home" ? "text-violet-hover" : "text-muted-foreground"}`} />
+            </div>
+            <span className={`text-[10px] font-medium ${activeTab === "home" ? "text-violet-hover" : "text-muted-foreground"}`}>
+              Home
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("pulse")}
+            className="flex flex-col items-center gap-1 py-1 px-6 transition-colors"
+          >
+            <div className={`p-1.5 rounded-full transition-all ${activeTab === "pulse" ? "bg-primary/20" : ""}`}>
+              <Activity className={`w-5 h-5 ${activeTab === "pulse" ? "text-violet-hover" : "text-muted-foreground"}`} />
+            </div>
+            <span className={`text-[10px] font-medium ${activeTab === "pulse" ? "text-violet-hover" : "text-muted-foreground"}`}>
+              Pulse
+            </span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };

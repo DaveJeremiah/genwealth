@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['"Playfair Display"', 'serif'],
-        body: ['Inter', 'sans-serif'],
+        body: ['"DM Sans"', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,12 +51,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        gold: {
-          DEFAULT: "hsl(var(--gold))",
-          dim: "hsl(var(--gold-dim))",
-          glow: "hsl(var(--gold-glow))",
+        violet: {
+          DEFAULT: "hsl(var(--violet))",
+          hover: "hsl(var(--violet-hover))",
+          glow: "hsl(var(--violet-glow))",
         },
+        success: "hsl(var(--success))",
+        transfer: "hsl(var(--transfer))",
         "surface-elevated": "hsl(var(--surface-elevated))",
+        "tab-bar": "hsl(var(--tab-bar))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -82,15 +85,31 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "pulse-gold": {
+        "pulse-violet": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.6" },
+        },
+        "count-up": {
+          "0%": { opacity: "0.5", transform: "translateY(4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in-up": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "slide-up": {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "pulse-gold": "pulse-gold 2s ease-in-out infinite",
+        "pulse-gold": "pulse-violet 2s ease-in-out infinite",
+        "pulse-violet": "pulse-violet 2s ease-in-out infinite",
+        "count-up": "count-up 0.4s ease-out",
+        "fade-in-up": "fade-in-up 0.3s ease-out",
+        "slide-up": "slide-up 0.3s ease-out",
       },
     },
   },
