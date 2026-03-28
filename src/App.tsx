@@ -18,7 +18,7 @@ const ProtectedRoutes = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 rounded-lg gold-gradient animate-pulse-gold" />
+        <div className="w-8 h-8 rounded-2xl violet-gradient animate-pulse-violet" />
       </div>
     );
   }
