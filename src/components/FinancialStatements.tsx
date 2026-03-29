@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Props {
   transactions: Transaction[];
@@ -25,6 +26,7 @@ const FinancialStatements = ({ transactions }: Props) => {
   const { formatUGX } = useCurrency();
   const [subTab, setSubTab] = useState<"pnl" | "balance" | "cashflow">("pnl");
   const monthOptions = useMemo(getMonthOptions, []);
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
 
   const fmt = (n: number) => formatUGX(Math.abs(n));
 
@@ -37,16 +39,36 @@ const FinancialStatements = ({ transactions }: Props) => {
 
   const filtered = filterThisMonth(transactions);
 
-  const incomeStatement = useMemo(() => {
+  const toggleCat = (cat: string) => {
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  // P&L data with individual transactions grouped by category
+  const pnlData = useMemo(() => {
     const income = filtered.filter((t) => t.type === "income");
     const expenses = filtered.filter((t) => t.type === "expense");
-    const incByCat: Record<string, number> = {};
-    const expByCat: Record<string, number> = {};
-    income.forEach((t) => { incByCat[t.category] = (incByCat[t.category] || 0) + t.ugx_amount; });
-    expenses.forEach((t) => { expByCat[t.category] = (expByCat[t.category] || 0) + t.ugx_amount; });
+
+    const groupByCategory = (txns: Transaction[]) => {
+      const map: Record<string, { total: number; items: Transaction[] }> = {};
+      txns.forEach((t) => {
+        if (!map[t.category]) map[t.category] = { total: 0, items: [] };
+        map[t.category].total += t.ugx_amount;
+        map[t.category].items.push(t);
+      });
+      return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+    };
+
+    const incomeGroups = groupByCategory(income);
+    const expenseGroups = groupByCategory(expenses);
     const totalIncome = income.reduce((s, t) => s + t.ugx_amount, 0);
     const totalExpenses = expenses.reduce((s, t) => s + t.ugx_amount, 0);
-    return { incByCat, expByCat, totalIncome, totalExpenses, profit: totalIncome - totalExpenses };
+
+    return { incomeGroups, expenseGroups, totalIncome, totalExpenses, profit: totalIncome - totalExpenses };
   }, [filtered]);
 
   const balanceSheet = useMemo(() => {
@@ -101,30 +123,48 @@ const FinancialStatements = ({ transactions }: Props) => {
         ))}
       </div>
 
-      {/* P&L */}
+      {/* P&L with collapsible categories */}
       {subTab === "pnl" && (
         <div className="space-y-3">
           <SectionLabel>Income</SectionLabel>
-          {Object.entries(incomeStatement.incByCat).map(([cat, amt]) => (
-            <StatRow key={cat} label={cat} amount={fmt(amt)} color="text-success" />
+          {pnlData.incomeGroups.length === 0 && <EmptyRow />}
+          {pnlData.incomeGroups.map(([cat, { total, items }]) => (
+            <CollapsibleCategory
+              key={cat}
+              category={cat}
+              total={fmt(total)}
+              color="text-success"
+              items={items}
+              expanded={expandedCats.has(`inc-${cat}`)}
+              onToggle={() => toggleCat(`inc-${cat}`)}
+              formatAmount={fmt}
+            />
           ))}
-          {Object.keys(incomeStatement.incByCat).length === 0 && <EmptyRow />}
-          <TotalRow label="Total Income" amount={fmt(incomeStatement.totalIncome)} color="text-success" />
+          <TotalRow label="Total Income" amount={fmt(pnlData.totalIncome)} color="text-success" />
 
           <SectionLabel>Expenses</SectionLabel>
-          {Object.entries(incomeStatement.expByCat).map(([cat, amt]) => (
-            <StatRow key={cat} label={cat} amount={fmt(amt)} color="text-destructive" />
+          {pnlData.expenseGroups.length === 0 && <EmptyRow />}
+          {pnlData.expenseGroups.map(([cat, { total, items }]) => (
+            <CollapsibleCategory
+              key={cat}
+              category={cat}
+              total={fmt(total)}
+              color="text-destructive"
+              items={items}
+              expanded={expandedCats.has(`exp-${cat}`)}
+              onToggle={() => toggleCat(`exp-${cat}`)}
+              formatAmount={fmt}
+            />
           ))}
-          {Object.keys(incomeStatement.expByCat).length === 0 && <EmptyRow />}
-          <TotalRow label="Total Expenses" amount={fmt(incomeStatement.totalExpenses)} color="text-destructive" />
+          <TotalRow label="Total Expenses" amount={fmt(pnlData.totalExpenses)} color="text-destructive" />
 
           <Divider />
           <div className="flex justify-between items-center">
             <span className="text-base font-display font-bold text-foreground">
-              {incomeStatement.profit >= 0 ? "Net Profit" : "Net Loss"}
+              {pnlData.profit >= 0 ? "Net Profit" : "Net Loss"}
             </span>
             <span className="text-base font-display font-bold text-violet-hover">
-              {fmt(incomeStatement.profit)}
+              {fmt(pnlData.profit)}
             </span>
           </div>
         </div>
@@ -193,6 +233,39 @@ const FinancialStatements = ({ transactions }: Props) => {
     </div>
   );
 };
+
+// Collapsible category component for P&L
+const CollapsibleCategory = ({
+  category, total, color, items, expanded, onToggle, formatAmount,
+}: {
+  category: string; total: string; color: string;
+  items: Transaction[]; expanded: boolean;
+  onToggle: () => void; formatAmount: (n: number) => string;
+}) => (
+  <div>
+    <button onClick={onToggle} className="w-full flex justify-between items-center py-1.5 hover:bg-card/50 rounded transition-colors -mx-1 px-1">
+      <div className="flex items-center gap-1.5">
+        {expanded ? (
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+        )}
+        <span className="text-sm text-foreground">{category}</span>
+      </div>
+      <span className={`text-sm font-medium ${color}`}>{total}</span>
+    </button>
+    {expanded && (
+      <div className="ml-5 space-y-0.5 pb-1">
+        {items.map((t) => (
+          <div key={t.id} className="flex justify-between items-center py-1">
+            <span className="text-xs text-muted-foreground truncate flex-1 mr-2">{t.description}</span>
+            <span className={`text-xs ${color} opacity-80`}>{formatAmount(t.ugx_amount)}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium pt-2">{children}</p>
