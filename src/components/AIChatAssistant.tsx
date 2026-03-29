@@ -110,7 +110,7 @@ const AIChatAssistant = ({ currentScreen = "home" }: AIChatAssistantProps) => {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-20 right-4 z-50 w-11 h-11 rounded-full bg-primary shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-violet-hover transition-colors"
+          className="fixed right-4 z-50 w-11 h-11 rounded-full bg-primary shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-violet-hover transition-colors bottom-[calc(5.5rem+max(env(safe-area-inset-bottom),14px))]"
           aria-label="Open AI Assistant"
         >
           <MessageCircle className="w-5 h-5 text-primary-foreground" />
@@ -129,7 +129,7 @@ const AIChatAssistant = ({ currentScreen = "home" }: AIChatAssistantProps) => {
             <div className="flex flex-col items-center pt-2 pb-3 px-4 border-b border-border" style={{ borderBottomWidth: '0.5px' }}>
               <div className="w-10 h-1 rounded-full bg-border mb-3" />
               <div className="flex items-center justify-between w-full">
-                <span className="text-sm font-display font-semibold text-foreground">Wealth OS Assistant</span>
+                <span className="text-sm font-display font-semibold text-foreground">Jenwealthy Assistant</span>
                 <div className="flex items-center gap-1">
                   {messages.length > 0 && (
                     <button onClick={clearChat} className="p-1.5 rounded-full text-muted-foreground hover:text-destructive transition-colors" title="Clear chat">

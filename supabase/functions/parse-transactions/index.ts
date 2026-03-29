@@ -61,7 +61,20 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a personal financial accountant based in Uganda. Parse the user's natural language input and return a JSON array of transactions. Each transaction must have: id (generate a random uuid string), date (use ${today} if not specified), description, amount (always positive number — the original amount in the original currency), currency (default to UGX if no currency is mentioned. Use standard 3-letter codes: UGX, USD, EUR, GBP, KES, etc. For crypto use: BTC, ETH, SOL, XRP, USDT, USDC, BNB, ADA, DOGE, DOT), type (income/expense/asset/liability/transfer-in/transfer-out), category (Housing/Food & Dining/Transport/Entertainment/Health/Shopping/Utilities/Investments/Crypto/Property/Salary/Freelance/Business/Savings/Transfer/Other), account (Cash/Bank/Mobile Money/Investment/Crypto/Property/Other).
+            content: `You are a personal financial accountant based in Uganda. Parse the user's natural language input and return a JSON array of transactions. Each transaction must have: id (generate a random uuid string), date (use ${today} if not specified), description, amount (the original amount in the original currency — almost always positive; see LOANS AND DEBT below for the exception), currency (default to UGX if no currency is mentioned. Use standard 3-letter codes: UGX, USD, EUR, GBP, KES, etc. For crypto use: BTC, ETH, SOL, XRP, USDT, USDC, BNB, ADA, DOGE, DOT), type (income/expense/asset/liability/transfer-in/transfer-out), category (Housing/Food & Dining/Transport/Entertainment/Health/Shopping/Utilities/Investments/Crypto/Property/Salary/Freelance/Business/Savings/Transfer/Other — for new debt liabilities use exactly one of: Loan, Mortgage, Credit Card, Payday Loan, Other), account (Cash/Bank/Mobile Money/Investment/Crypto/Property/Other).
+
+LOANS AND DEBT (DOUBLE ENTRY):
+- When the user records receiving a loan, credit facility, borrowed money, or any debt instrument (money they must repay), return TWO entries from one input — same date, same currency, same numeric amount (positive) on both lines:
+  Entry A — type: asset, account: the account the money landed in (default Bank if not specified), amount: loan amount, description: "Loan received — [lender or short description]", category: Savings
+  Entry B — type: liability, account: Other, amount: same positive amount, description: "Loan payable — [lender or short description]", category: exactly one of Loan, Mortgage, Credit Card, Payday Loan, Other (pick the debt type that best matches: mortgage→Mortgage, credit card→Credit Card, payday→Payday Loan, generic loan→Loan, else Other)
+- Net worth is unchanged (asset equals liability). The insight for this case MUST convey: "This loan added cash to your account and an equal debt to your liabilities. Your net worth is unchanged — but you now have liquidity to deploy. Every shilling you spend from it is a real expense. It only leaves your liabilities when you explicitly repay it." (You may tighten wording slightly but keep this meaning.)
+- When the user records drawing on a revolving credit line or "using credit" (not a generic loan disbursement), use the same two-entry pattern but Entry A description must start with "Credit used — [description]" and Entry B remains liability with "Loan payable — ..." or appropriate credit liability wording; category for debt should be Credit Card when applicable.
+- When the user records a LOAN REPAYMENT (signals: repaid, paid back, settled the loan, loan payment, cleared debt, paid down debt, installment on a loan, etc.), return TWO entries — same date, same currency:
+  Entry A — type: transfer-out, account: Bank or Cash (whichever they paid from; default Bank), amount: repayment amount (positive), description: "Loan repayment — [description]", category: Transfer
+  Entry B — type: liability, account: Other, amount: NEGATIVE number whose absolute value equals the repayment amount (this reduces the debt), description: "Loan balance reduced — [description]", category: same debt-type category as the original loan if inferable, else Other
+- If they fully settle a non-revolving debt or emphasize debt closure, you may use description "Debt settled — [description]" on the transfer-out and "Debt balance reduced — [description]" on the negative liability instead of the loan repayment wording — still two entries, liability amount negative.
+- Loan repayments must NEVER be coded as expense — they are balance-sheet and transfer movements only (cash down, liability down; net worth unchanged). The insight must NOT treat repayment as spending or P&L expense.
+- Spending that happens to use borrowed funds is still normal expense (income/expense) when they describe a purchase — only the borrowing/repaying uses the rules above.
 
 TRANSFER DETECTION RULES:
 - "transfer" is a valid type alongside income/expense/asset/liability.
@@ -138,15 +151,18 @@ Also return a single 'insight' string — one sharp, direct observation about wh
     const enriched = await Promise.all(
       parsed.transactions.map(async (t: any) => {
         const cur = (t.currency || "UGX").toUpperCase();
+        const rawAmt = Number(t.amount);
+        const sign = rawAmt < 0 ? -1 : 1;
+        const absAmt = Math.abs(rawAmt);
         let ugxAmount: number;
         if (cur === "UGX") {
-          ugxAmount = t.amount;
+          ugxAmount = absAmt;
         } else if (CRYPTOS.includes(cur)) {
-          ugxAmount = await cryptoToUGX(t.amount, cur);
+          ugxAmount = await cryptoToUGX(absAmt, cur);
         } else {
-          ugxAmount = await fiatToUGX(t.amount, cur);
+          ugxAmount = await fiatToUGX(absAmt, cur);
         }
-        return { ...t, currency: cur, ugx_amount: Math.round(ugxAmount) };
+        return { ...t, amount: rawAmt, currency: cur, ugx_amount: sign * Math.round(ugxAmount) };
       })
     );
 

@@ -4,11 +4,10 @@ interface StatsCardsProps {
   netWorth: number;
   cashFlow: number;
   savingsRate: number;
-  wealthScore: number;
-  wealthLabel: string;
+  totalIncome: number;
 }
 
-const StatsCards = ({ netWorth, cashFlow, savingsRate, wealthScore, wealthLabel }: StatsCardsProps) => {
+const StatsCards = ({ netWorth, cashFlow, savingsRate, totalIncome }: StatsCardsProps) => {
   const { formatUGX, displayCurrency, convertFromUGX } = useCurrency();
 
   const usdEquiv = displayCurrency === "UGX"
@@ -44,13 +43,13 @@ const StatsCards = ({ netWorth, cashFlow, savingsRate, wealthScore, wealthLabel 
         <p className="text-[10px] text-muted-foreground">of income</p>
       </div>
 
-      {/* Wealth Score */}
+      {/* Total Income */}
       <div className="glass-card rounded-2xl p-4 space-y-1">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Wealth Score</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Income</p>
         <p className="text-xl font-display font-bold text-violet-hover animate-count-up">
-          {wealthScore}
+          {formatUGX(totalIncome)}
         </p>
-        <p className="text-[10px] text-muted-foreground">{wealthLabel}</p>
+        <p className="text-[10px] text-muted-foreground">all time</p>
       </div>
     </div>
   );

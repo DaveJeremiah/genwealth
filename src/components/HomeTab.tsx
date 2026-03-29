@@ -1,12 +1,35 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { Pencil } from "lucide-react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import TransactionInput from "@/components/TransactionInput";
 import StatsCards from "@/components/StatsCards";
 import FinancialStatements from "@/components/FinancialStatements";
 import TransactionLog from "@/components/TransactionLog";
+import WishListPanel from "@/components/WishListPanel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
+const CASUAL_GREETINGS: ((name: string) => string)[] = [
+  (n) => `Sap, ${n} 👊`,
+  (n) => `Hi ${n}, let's get it 💪`,
+  (n) => `What's good, ${n}?`,
+  () => `Holla, fellow rich 🤑`,
+  () => `Bro, check your bag 💰`,
+  (n) => `Grandmaster ${n} is in 👑`,
+  (n) => `Mr. ${n}, welcome back 🏦`,
+  () => `Fam, the numbers await 📊`,
+  (n) => `Bigman ${n}, what's the move? 💼`,
+  () => `Ssebo, webale okujja 🙌`,
+  () => `Boss, your empire awaits 🏰`,
+  (n) => `Ey ${n}, let's build today 🔨`,
+];
 
 interface HomeTabProps {
   transactions: Transaction[];
@@ -25,28 +48,61 @@ interface HomeTabProps {
 
 const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }: HomeTabProps) => {
   const { formatUGX } = useCurrency();
+  const { user, updateNickname } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [sectionTab, setSectionTab] = useState<"recent" | "statements">("recent");
+  const [sectionTab, setSectionTab] = useState<"recent" | "statements" | "wishlist">("recent");
+  const [nickSheetOpen, setNickSheetOpen] = useState(false);
+  const [nickDraft, setNickDraft] = useState("");
+  const [nickSaving, setNickSaving] = useState(false);
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  }, []);
+  const nickMeta = user?.user_metadata?.nickname;
+  const nickname =
+    nickMeta != null && String(nickMeta).trim() !== "" ? String(nickMeta).trim() : "";
+  const greetingName = nickname || displayName;
+
+  const casualGreeting = useMemo(() => {
+    const uid = user?.id ?? "guest";
+    const key = `jenwealthy_greet_${uid}_${greetingName}`;
+    try {
+      const hit = sessionStorage.getItem(key);
+      if (hit) return hit;
+    } catch {
+      /* private mode */
+    }
+    const pick = CASUAL_GREETINGS[Math.floor(Math.random() * CASUAL_GREETINGS.length)];
+    const g = pick(greetingName);
+    try {
+      sessionStorage.setItem(key, g);
+    } catch {
+      /* ignore */
+    }
+    return g;
+  }, [greetingName, user?.id]);
+
+  const openNickSheet = () => {
+    setNickDraft(nickname);
+    setNickSheetOpen(true);
+  };
+
+  const saveNickname = async () => {
+    setNickSaving(true);
+    try {
+      await updateNickname(nickDraft);
+      setNickSheetOpen(false);
+      toast({ title: "Nickname saved" });
+    } catch (e: unknown) {
+      toast({
+        title: "Could not save",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setNickSaving(false);
+    }
+  };
 
   const today = format(new Date(), "EEEE, MMMM d");
-
-  // Wealth score estimation
-  const wealthScore = useMemo(() => {
-    if (stats.netWorth <= 0) return 20;
-    if (stats.savingsRate >= 50) return 80;
-    if (stats.savingsRate >= 30) return 65;
-    if (stats.savingsRate >= 15) return 50;
-    return 35;
-  }, [stats]);
-
-  const wealthLabel = wealthScore >= 70 ? "Wealth Builder" : wealthScore >= 50 ? "Early Builder" : wealthScore >= 35 ? "Getting Started" : "Foundation";
 
   return (
     <div className="space-y-6 pt-2">
@@ -54,8 +110,50 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       <div>
         <p className="text-sm text-muted-foreground">{today}</p>
         <h1 className="text-2xl font-display font-bold text-foreground mt-1">
-          {greeting}, {displayName}.
+          {casualGreeting}
         </h1>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={openNickSheet}
+            className="flex items-center gap-1 text-xs font-medium text-violet-hover hover:underline"
+          >
+            <Pencil className="w-3 h-3" />
+            {nickname ? "Edit nickname" : "Set nickname"}
+          </button>
+        </div>
+        <Sheet open={nickSheetOpen} onOpenChange={setNickSheetOpen}>
+          <SheetContent side="bottom" className="rounded-t-3xl">
+            <SheetHeader>
+              <SheetTitle className="font-display">Your nickname</SheetTitle>
+            </SheetHeader>
+            <p className="text-xs text-muted-foreground pt-1 pb-3">
+              Used in your welcome line. Leave blank to use your email name ({displayName}).
+            </p>
+            <div className="space-y-4 pb-4">
+              <div className="space-y-2">
+                <Label htmlFor="nickname-input">Nickname</Label>
+                <Input
+                  id="nickname-input"
+                  value={nickDraft}
+                  onChange={(e) => setNickDraft(e.target.value)}
+                  placeholder={displayName}
+                  className="bg-card"
+                  maxLength={48}
+                  autoComplete="nickname"
+                />
+              </div>
+              <Button
+                type="button"
+                className="w-full rounded-full bg-primary hover:bg-violet-hover"
+                disabled={nickSaving}
+                onClick={saveNickname}
+              >
+                Save
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Pill Input */}
@@ -66,8 +164,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
         netWorth={stats.netWorth}
         cashFlow={stats.income - stats.expenses}
         savingsRate={stats.savingsRate}
-        wealthScore={wealthScore}
-        wealthLabel={wealthLabel}
+        totalIncome={stats.income}
       />
 
       {/* AI Insight Card */}
@@ -79,7 +176,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
 
       {/* Section Tabs */}
       <div>
-        <div className="flex gap-6 relative">
+        <div className="flex gap-6 relative flex-wrap">
           <button
             onClick={() => setSectionTab("recent")}
             className={`pb-2 text-sm font-medium transition-colors ${
@@ -96,6 +193,14 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
           >
             Statements
           </button>
+          <button
+            onClick={() => setSectionTab("wishlist")}
+            className={`pb-2 text-sm font-medium transition-colors ${
+              sectionTab === "wishlist" ? "text-violet-hover border-b-2 border-primary" : "text-muted-foreground"
+            }`}
+          >
+            Wish List
+          </button>
         </div>
         <div className="border-b border-border" style={{ borderBottomWidth: '0.5px' }} />
       </div>
@@ -110,8 +215,10 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
             </button>
           </div>
         </>
-      ) : (
+      ) : sectionTab === "statements" ? (
         <FinancialStatements transactions={transactions} />
+      ) : (
+        <WishListPanel />
       )}
     </div>
   );

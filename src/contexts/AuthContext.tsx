@@ -9,6 +9,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Persists to Supabase user_metadata; empty string removes nickname (greeting falls back to email name). */
+  updateNickname: (nickname: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,8 +55,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
   };
 
+  const updateNickname = async (nickname: string) => {
+    const trimmed = nickname.trim();
+    const { data: { session: s } } = await supabase.auth.getSession();
+    const prev = (s?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    const next: Record<string, unknown> = { ...prev, nickname: trimmed.length > 0 ? trimmed : null };
+    const { error } = await supabase.auth.updateUser({ data: next });
+    if (error) throw error;
+  };
+
   return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut, updateNickname }}>
       {children}
     </AuthContext.Provider>
   );
