@@ -47,7 +47,7 @@ const ASSET_ACCOUNTS = ["Cash", "Bank", "Investments", "Crypto", "Property"];
 const LIABILITY_TYPES = ["Loans", "Mortgages", "Credit Cards", "Payday Loans", "Other"];
 
 const PulseTab = ({ transactions, stats }: PulseTabProps) => {
-  const { formatUGX, convertToUSD } = useCurrency();
+  const { formatUGX, convertFromUGX } = useCurrency();
 
   const quickStats = [
     { label: "Total Assets", value: formatUGX(stats.assets) },
@@ -87,7 +87,7 @@ const PulseTab = ({ transactions, stats }: PulseTabProps) => {
 // ─── Wealth Breakdown ────────────────────────────────────────────
 
 const WealthBreakdown = ({ transactions }: { transactions: Transaction[] }) => {
-  const { formatUGX, convertToUSD } = useCurrency();
+  const { formatUGX, convertFromUGX } = useCurrency();
   const { user } = useAuth();
   const { addTransactions, updateTransaction, deleteTransaction } = useTransactions();
 

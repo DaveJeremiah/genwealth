@@ -9,6 +9,7 @@ import { OfflineProvider } from "@/contexts/OfflineContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import EntriesPage from "./pages/EntriesPage";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const ProtectedRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/entries" element={<EntriesPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

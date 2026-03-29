@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -24,6 +25,7 @@ interface HomeTabProps {
 
 const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }: HomeTabProps) => {
   const { formatUGX } = useCurrency();
+  const navigate = useNavigate();
   const [sectionTab, setSectionTab] = useState<"recent" | "statements">("recent");
 
   const greeting = useMemo(() => {
@@ -100,7 +102,14 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
 
       {/* Section Content */}
       {sectionTab === "recent" ? (
-        <RecentEntries transactions={transactions} />
+        <>
+          <RecentEntries transactions={transactions} />
+          <div className="pt-2 text-center">
+            <button onClick={() => navigate("/entries")} className="text-xs font-medium text-violet-hover hover:underline transition-colors">
+              See all →
+            </button>
+          </div>
+        </>
       ) : (
         <FinancialStatements transactions={transactions} />
       )}
