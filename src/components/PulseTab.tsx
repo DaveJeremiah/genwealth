@@ -294,7 +294,7 @@ const WealthBreakdown = ({ transactions }: { transactions: Transaction[] }) => {
         <div className="text-center">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Worth</p>
           <p className="text-2xl font-display font-bold text-violet-hover">{formatUGX(netWorth)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">≈ ${convertToUSD(netWorth).toLocaleString()} USD</p>
+          <p className="text-xs text-muted-foreground mt-0.5">≈ ${Math.round(convertFromUGX(netWorth)).toLocaleString()} USD</p>
         </div>
       </div>
 
