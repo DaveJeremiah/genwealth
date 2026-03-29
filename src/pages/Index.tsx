@@ -64,7 +64,7 @@ const Index = () => {
       </header>
 
       {/* Main content */}
-      <main className="pb-24 max-w-lg mx-auto px-4">
+      <main className="pb-28 max-w-lg mx-auto px-4">
         {activeTab === "home" ? (
           <HomeTab
             transactions={transactions}
@@ -83,7 +83,7 @@ const Index = () => {
 
       {/* Bottom tab bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[hsl(0,0%,5%)] border-t border-[hsl(0,0%,10%)]" style={{ borderTopWidth: '0.5px' }}>
-        <div className="max-w-lg mx-auto flex items-center justify-around py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <div className="max-w-lg mx-auto flex items-center justify-around pt-2 pb-[calc(1rem+max(env(safe-area-inset-bottom),14px))]">
           <button
             onClick={() => setActiveTab("home")}
             className="flex flex-col items-center gap-1 py-1 px-6 transition-colors"

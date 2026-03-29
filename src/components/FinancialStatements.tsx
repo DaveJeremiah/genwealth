@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   transactions: Transaction[];
@@ -84,17 +85,49 @@ const FinancialStatements = ({ transactions }: Props) => {
   }, [transactions]);
 
   const cashFlow = useMemo(() => {
-    const incByCat: Record<string, number> = {};
-    const expByCat: Record<string, number> = {};
-    const transfers: Record<string, number> = {};
-    filtered.forEach((t) => {
-      if (t.type === "income") incByCat[t.category] = (incByCat[t.category] || 0) + t.ugx_amount;
-      else if (t.type === "expense") expByCat[t.category] = (expByCat[t.category] || 0) + t.ugx_amount;
-      else if (t.type.startsWith("transfer")) transfers[t.description] = (transfers[t.description] || 0) + t.ugx_amount;
+    const income = filtered.filter((t) => t.type === "income");
+    const expenses = filtered.filter((t) => t.type === "expense");
+
+    const groupByCategory = (txns: Transaction[]) => {
+      const map: Record<string, { total: number; items: Transaction[] }> = {};
+      txns.forEach((t) => {
+        if (!map[t.category]) map[t.category] = { total: 0, items: [] };
+        map[t.category].total += t.ugx_amount;
+        map[t.category].items.push(t);
+      });
+      return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+    };
+
+    const incomeGroups = groupByCategory(income);
+    const expenseGroups = groupByCategory(expenses);
+    const totalIncome = income.reduce((s, t) => s + t.ugx_amount, 0);
+    const totalExpenses = expenses.reduce((s, t) => s + t.ugx_amount, 0);
+    const netOperating = totalIncome - totalExpenses;
+
+    const financingLoanAsset = filtered.filter(
+      (t) =>
+        t.type === "asset" &&
+        (/Loan received/i.test(t.description) || /Credit used/i.test(t.description))
+    );
+    const financingLiabilityRepay = filtered.filter((t) => t.type === "liability" && t.ugx_amount < 0);
+    const financingRows = [...financingLoanAsset, ...financingLiabilityRepay].sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.id.localeCompare(b.id);
     });
-    const totalIn = Object.values(incByCat).reduce((s, v) => s + v, 0);
-    const totalOut = Object.values(expByCat).reduce((s, v) => s + v, 0);
-    return { incByCat, expByCat, transfers, netCashFlow: totalIn - totalOut };
+
+    const netFinancing = financingRows.reduce((s, t) => s + t.ugx_amount, 0);
+    const netCashPosition = netOperating + netFinancing;
+
+    return {
+      incomeGroups,
+      expenseGroups,
+      totalIncome,
+      totalExpenses,
+      netOperating,
+      financingRows,
+      netFinancing,
+      netCashPosition,
+    };
   }, [filtered]);
 
   const subTabs = [
@@ -200,33 +233,112 @@ const FinancialStatements = ({ transactions }: Props) => {
       {/* Cash Flow */}
       {subTab === "cashflow" && (
         <div className="space-y-3">
-          <SectionLabel>Money In</SectionLabel>
-          {Object.entries(cashFlow.incByCat).map(([cat, amt]) => (
-            <StatRow key={cat} label={cat} amount={fmt(amt)} color="text-success" />
+          <SectionLabel>Operating — Money In</SectionLabel>
+          {cashFlow.incomeGroups.length === 0 && <EmptyRow />}
+          {cashFlow.incomeGroups.map(([cat, { total, items }]) => (
+            <CollapsibleCategory
+              key={cat}
+              category={cat}
+              total={fmt(total)}
+              color="text-success"
+              items={items}
+              expanded={expandedCats.has(`cf-inc-${cat}`)}
+              onToggle={() => toggleCat(`cf-inc-${cat}`)}
+              formatAmount={fmt}
+            />
           ))}
-          {Object.keys(cashFlow.incByCat).length === 0 && <EmptyRow />}
+          <TotalRow label="Total Income" amount={fmt(cashFlow.totalIncome)} color="text-success" />
 
-          <SectionLabel>Money Out</SectionLabel>
-          {Object.entries(cashFlow.expByCat).map(([cat, amt]) => (
-            <StatRow key={cat} label={cat} amount={fmt(amt)} color="text-destructive" />
+          <SectionLabel>Operating — Money Out</SectionLabel>
+          {cashFlow.expenseGroups.length === 0 && <EmptyRow />}
+          {cashFlow.expenseGroups.map(([cat, { total, items }]) => (
+            <CollapsibleCategory
+              key={cat}
+              category={cat}
+              total={fmt(total)}
+              color="text-destructive"
+              items={items}
+              expanded={expandedCats.has(`cf-exp-${cat}`)}
+              onToggle={() => toggleCat(`cf-exp-${cat}`)}
+              formatAmount={fmt}
+            />
           ))}
-          {Object.keys(cashFlow.expByCat).length === 0 && <EmptyRow />}
+          <TotalRow label="Total Expenses" amount={fmt(cashFlow.totalExpenses)} color="text-destructive" />
 
-          {Object.keys(cashFlow.transfers).length > 0 && (
-            <>
-              <SectionLabel>Transfers <span className="font-normal">(moved between accounts)</span></SectionLabel>
-              {Object.entries(cashFlow.transfers).map(([desc, amt]) => (
-                <StatRow key={desc} label={desc} amount={fmt(amt)} color="text-transfer" />
-              ))}
-            </>
+          <div className="flex items-center gap-1.5 pt-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Financing</p>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-full p-0.5 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  aria-label="About financing cash flow"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+                This section shows money from borrowing and repayments. It&apos;s separate from your income and expenses because borrowed money isn&apos;t earned — it&apos;s owed.
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          {cashFlow.financingRows.length === 0 && <EmptyRow />}
+          {cashFlow.financingRows.map((t) => {
+            const signed = t.ugx_amount;
+            const positive = signed > 0;
+            return (
+              <div key={t.id} className="flex justify-between items-center py-1.5 gap-2">
+                <span className="text-sm text-foreground truncate flex-1">{formatFinancingRowLabel(t)}</span>
+                <span className={`text-sm font-medium shrink-0 ${positive ? "text-success" : "text-destructive"}`}>
+                  {formatUGX(signed)}
+                </span>
+              </div>
+            );
+          })}
+          {cashFlow.financingRows.length > 0 && (
+            <div className="flex justify-between items-center py-1.5 border-t border-border" style={{ borderTopWidth: "0.5px" }}>
+              <span className={`text-sm font-bold ${cashFlow.netFinancing >= 0 ? "text-success" : "text-destructive"}`}>
+                Net Financing
+              </span>
+              <span className={`text-sm font-bold ${cashFlow.netFinancing >= 0 ? "text-success" : "text-destructive"}`}>
+                {formatUGX(cashFlow.netFinancing)}
+              </span>
+            </div>
           )}
 
           <Divider />
-          <div className="flex justify-between items-center">
-            <span className="text-base font-display font-bold text-foreground">Net Cash Flow</span>
-            <span className={`text-base font-display font-bold ${cashFlow.netCashFlow >= 0 ? "text-success" : "text-destructive"}`}>
-              {fmt(cashFlow.netCashFlow)}
-            </span>
+          <div className="space-y-3 rounded-xl border border-border bg-card/40 p-3" style={{ borderWidth: "0.5px" }}>
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <span className="text-base font-display font-bold text-foreground">Net Operating Cash</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Income minus expenses</p>
+              </div>
+              <span
+                className={`text-base font-display font-bold shrink-0 ${cashFlow.netOperating >= 0 ? "text-success" : "text-destructive"}`}
+              >
+                {formatUGX(cashFlow.netOperating)}
+              </span>
+            </div>
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <span className="text-base font-display font-bold text-foreground">Net Financing</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Loans received minus repayments</p>
+              </div>
+              <span
+                className={`text-base font-display font-bold shrink-0 ${cashFlow.netFinancing >= 0 ? "text-success" : "text-destructive"}`}
+              >
+                {formatUGX(cashFlow.netFinancing)}
+              </span>
+            </div>
+            <Divider />
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-display font-bold text-foreground">Net Cash Position</span>
+              <span
+                className={`text-lg font-display font-bold ${cashFlow.netCashPosition >= 0 ? "text-success" : "text-destructive"}`}
+              >
+                {formatUGX(cashFlow.netCashPosition)}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -292,5 +404,19 @@ const EmptyRow = () => (
 const Divider = () => (
   <div className="border-t border-border" style={{ borderTopWidth: '0.5px' }} />
 );
+
+/** Maps stored liability repayment descriptions to Cash Flow financing labels. */
+function formatFinancingRowLabel(t: Transaction): string {
+  const d = t.description;
+  if (t.type === "liability" && t.ugx_amount < 0) {
+    if (/^Loan balance reduced\s*—\s*/i.test(d)) {
+      return d.replace(/^Loan balance reduced\s*—\s*/i, "Loan repayment — ");
+    }
+    if (/^Debt balance reduced\s*—\s*/i.test(d)) {
+      return d.replace(/^Debt balance reduced\s*—\s*/i, "Debt settled — ");
+    }
+  }
+  return d;
+}
 
 export default FinancialStatements;

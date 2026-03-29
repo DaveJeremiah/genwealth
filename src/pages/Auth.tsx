@@ -37,7 +37,7 @@ const Auth = () => {
             <div className="w-10 h-10 rounded-2xl violet-gradient flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-display font-bold violet-text">Wealth OS</h1>
+            <h1 className="text-3xl font-display font-bold violet-text">Jenwealthy</h1>
           </div>
           <p className="text-sm" style={{ color: '#999' }}>
             Income is not wealth. Ownership is.

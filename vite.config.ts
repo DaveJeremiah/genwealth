@@ -24,8 +24,8 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
       },
       manifest: {
-        name: "Wealth OS — Personal Finance Command Center",
-        short_name: "Wealth OS",
+        name: "Jenwealthy — Personal Finance Command Center",
+        short_name: "Jenwealthy",
         description: "AI-powered personal finance tool. Track wealth, not just spending.",
         theme_color: "#0a0a0a",
         background_color: "#0a0a0a",
