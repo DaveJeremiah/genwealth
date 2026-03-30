@@ -104,13 +104,34 @@ const AIChatAssistant = ({ currentScreen = "home" }: AIChatAssistantProps) => {
     setMessages([]);
   };
 
+  // Auto-hide FAB when not scrolling
+  const [fabVisible, setFabVisible] = useState(true);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setFabVisible(true);
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = setTimeout(() => setFabVisible(false), 1500);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    // Hide after initial load too
+    scrollTimerRef.current = setTimeout(() => setFabVisible(false), 3000);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    };
+  }, []);
+
   return (
     <>
-      {/* FAB - above tab bar */}
+      {/* FAB - above tab bar, auto-hides when not scrolling */}
       {!open && (
         <button
-          onClick={() => setOpen(true)}
-          className="fixed right-4 z-50 w-11 h-11 rounded-full bg-primary shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-violet-hover transition-colors bottom-[calc(8rem+max(env(safe-area-inset-bottom),14px))]"
+          onClick={() => { setOpen(true); setFabVisible(true); }}
+          className={`fixed right-4 z-50 w-11 h-11 rounded-full bg-primary shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-violet-hover transition-all duration-300 bottom-[calc(8rem+max(env(safe-area-inset-bottom),14px))] ${
+            fabVisible ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"
+          }`}
           aria-label="Open AI Assistant"
         >
           <MessageCircle className="w-5 h-5 text-primary-foreground" />
