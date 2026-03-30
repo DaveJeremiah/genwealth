@@ -162,7 +162,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     return (
       <div className="relative">
         <div
-          className="flex items-start rounded-full bg-card border transition-all duration-200 focus-within:border-primary/60"
+          className="flex items-start rounded-full bg-card border transition-all duration-200 focus-within:border-primary/60 shadow-md"
           style={{ borderWidth: '0.5px', borderColor: 'hsl(263, 83%, 58%, 0.27)' }}
         >
           <textarea
@@ -170,7 +170,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="What happened financially today?"
-            className="flex-1 bg-transparent px-5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body resize-none overflow-hidden min-h-[44px]"
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body resize-none overflow-hidden min-h-[44px] px-[20px] py-[20px]"
             rows={1}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
