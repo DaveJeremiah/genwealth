@@ -74,7 +74,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
   const today = format(new Date(), "EEEE, MMMM d");
 
   return (
-    <div className="space-y-6 pt-2">
+    <div className="space-y-6 pt-2 pb-[2px]">
       {/* Greeting */}
       <div>
         <p className="text-sm text-muted-foreground">{today}</p>
@@ -136,7 +136,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       {sectionTab === "recent" ? (
         <>
           <RecentEntries transactions={transactions} />
-          <div className="pt-2 text-center">
+          <div className="pt-2 text-center py-0">
             <button onClick={() => navigate("/entries")} className="text-xs font-medium text-violet-hover hover:underline transition-colors">
               See all →
             </button>
