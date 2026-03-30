@@ -1,20 +1,14 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Pencil } from "lucide-react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
 import TransactionInput from "@/components/TransactionInput";
 import StatsCards from "@/components/StatsCards";
 import FinancialStatements from "@/components/FinancialStatements";
 import TransactionLog from "@/components/TransactionLog";
 import WishListPanel from "@/components/WishListPanel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const CASUAL_GREETINGS: ((name: string) => string)[] = [
   (n) => `Sap, ${n} 👊`,
@@ -48,13 +42,9 @@ interface HomeTabProps {
 
 const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }: HomeTabProps) => {
   const { formatUGX } = useCurrency();
-  const { user, updateNickname } = useAuth();
-  const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [sectionTab, setSectionTab] = useState<"recent" | "statements" | "wishlist">("recent");
-  const [nickSheetOpen, setNickSheetOpen] = useState(false);
-  const [nickDraft, setNickDraft] = useState("");
-  const [nickSaving, setNickSaving] = useState(false);
 
   const nickMeta = user?.user_metadata?.nickname;
   const nickname =
@@ -80,27 +70,6 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
     return g;
   }, [greetingName, user?.id]);
 
-  const openNickSheet = () => {
-    setNickDraft(nickname);
-    setNickSheetOpen(true);
-  };
-
-  const saveNickname = async () => {
-    setNickSaving(true);
-    try {
-      await updateNickname(nickDraft);
-      setNickSheetOpen(false);
-      toast({ title: "Nickname saved" });
-    } catch (e: unknown) {
-      toast({
-        title: "Could not save",
-        description: e instanceof Error ? e.message : "Try again",
-        variant: "destructive",
-      });
-    } finally {
-      setNickSaving(false);
-    }
-  };
 
   const today = format(new Date(), "EEEE, MMMM d");
 
@@ -112,48 +81,6 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
         <h1 className="text-2xl font-display font-bold text-foreground mt-1">
           {casualGreeting}
         </h1>
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={openNickSheet}
-            className="flex items-center gap-1 text-xs font-medium text-violet-hover hover:underline"
-          >
-            <Pencil className="w-3 h-3" />
-            {nickname ? "Edit nickname" : "Set nickname"}
-          </button>
-        </div>
-        <Sheet open={nickSheetOpen} onOpenChange={setNickSheetOpen}>
-          <SheetContent side="bottom" className="rounded-t-3xl">
-            <SheetHeader>
-              <SheetTitle className="font-display">Your nickname</SheetTitle>
-            </SheetHeader>
-            <p className="text-xs text-muted-foreground pt-1 pb-3">
-              Used in your welcome line. Leave blank to use your email name ({displayName}).
-            </p>
-            <div className="space-y-4 pb-4">
-              <div className="space-y-2">
-                <Label htmlFor="nickname-input">Nickname</Label>
-                <Input
-                  id="nickname-input"
-                  value={nickDraft}
-                  onChange={(e) => setNickDraft(e.target.value)}
-                  placeholder={displayName}
-                  className="bg-card"
-                  maxLength={48}
-                  autoComplete="nickname"
-                />
-              </div>
-              <Button
-                type="button"
-                className="w-full rounded-full bg-primary hover:bg-violet-hover"
-                disabled={nickSaving}
-                onClick={saveNickname}
-              >
-                Save
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
       {/* Pill Input */}
