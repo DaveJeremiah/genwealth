@@ -289,10 +289,10 @@ const WishListPanel = () => {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      // Unmark: update purchased back to false
-                      updateItem.mutate({ id: item.id, purchased: false, actual_amount_paid: null, actual_currency: null, actual_ugx_amount: null, purchase_date: null });
-                    }}
+                    onClick={() => unmarkPurchased(item.id)}
+                    className="mt-0.5 shrink-0 text-primary hover:text-primary/70 transition-colors"
+                    aria-label="Unmark as purchased"
+                  >
                     className="mt-0.5 shrink-0 text-primary hover:text-primary/70 transition-colors"
                     aria-label="Unmark as purchased"
                   >
