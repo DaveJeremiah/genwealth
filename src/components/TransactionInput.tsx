@@ -152,7 +152,7 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="What happened financially today?"
-            className="flex-1 bg-transparent px-5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body"
+            className="flex-1 bg-transparent px-5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body my-[20px] mt-0 mb-[30px]"
             onKeyDown={(e) => { if (e.key === "Enter") handleOnlineSubmit(); }}
           />
           {loading ? (
