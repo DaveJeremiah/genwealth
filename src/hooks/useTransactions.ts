@@ -32,7 +32,7 @@ export const useTransactions = () => {
         const { data, error } = await supabase
           .from("transactions")
           .select("*")
-          .order("date", { ascending: false });
+          .order("created_at", { ascending: false });
         if (error) throw error;
         return data as unknown as Transaction[];
       }
@@ -41,7 +41,7 @@ export const useTransactions = () => {
         .where("user_id")
         .equals(user!.id)
         .toArray();
-      local.sort((a, b) => b.date.localeCompare(a.date));
+      local.sort((a, b) => b.created_at.localeCompare(a.created_at));
       return local as unknown as Transaction[];
     },
     enabled: !!user,

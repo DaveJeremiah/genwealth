@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useTransactions } from "@/hooks/useTransactions";
@@ -42,11 +42,27 @@ const Index = () => {
   const dotColor = !isOnline ? "bg-muted-foreground" : pendingCount > 0 ? "bg-amber-500" : "bg-success";
 
   const currencyOptions = ["UGX", "USD", "EUR", "GBP", "KES"] as const;
-  const rightLabel = displayCurrency === "UGX" ? "USD" : displayCurrency;
+  type CurrencyOption = (typeof currencyOptions)[number];
+  const LAST_NON_UGX_KEY = "wealthos_last_non_ugx_currency";
+
+  const [lastNonUgxCurrency, setLastNonUgxCurrency] = useState<CurrencyOption>(() => {
+    const saved = localStorage.getItem(LAST_NON_UGX_KEY);
+    if (saved && currencyOptions.includes(saved as CurrencyOption)) return saved as CurrencyOption;
+    return "USD";
+  });
+
+  useEffect(() => {
+    if (displayCurrency !== "UGX") {
+      setLastNonUgxCurrency(displayCurrency);
+      localStorage.setItem(LAST_NON_UGX_KEY, displayCurrency);
+    }
+  }, [displayCurrency]);
+
+  const rightLabel = displayCurrency === "UGX" ? lastNonUgxCurrency : displayCurrency;
   const rightSelected = displayCurrency !== "UGX";
 
   return (
-    <div className="min-h-screen bg-background font-body">
+    <div className="min-h-svh bg-background font-body">
       <OfflineBanner />
 
       {/* Minimal top header — with safe area for notch */}
@@ -84,7 +100,13 @@ const Index = () => {
                 {currencyOptions.map((c) => (
                   <DropdownMenuItem
                     key={c}
-                    onClick={() => setDisplayCurrency(c)}
+                    onClick={() => {
+                      setDisplayCurrency(c);
+                      if (c !== "UGX") {
+                        setLastNonUgxCurrency(c);
+                        localStorage.setItem(LAST_NON_UGX_KEY, c);
+                      }
+                    }}
                     className={displayCurrency === c ? "bg-accent text-accent-foreground" : undefined}
                   >
                     {c}

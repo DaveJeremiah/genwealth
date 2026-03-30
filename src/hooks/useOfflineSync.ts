@@ -30,7 +30,7 @@ export const useOfflineSync = (userId: string | undefined) => {
     if (!userId || !isOnline) return;
     try {
       // Cache transactions
-      const { data: txs } = await supabase.from("transactions").select("*").order("date", { ascending: false });
+      const { data: txs } = await supabase.from("transactions").select("*").order("created_at", { ascending: false });
       if (txs) {
         for (const t of txs) {
           await offlineDb.transactions.put({ ...t, synced: true } as LocalTransaction);
