@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 
-type DisplayCurrency = "UGX" | "USD" | "KES" | "EUR";
+type DisplayCurrency = "UGX" | "USD" | "KES" | "EUR" | "GBP";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   UGX: "UGX ", USD: "$", KES: "KES ", EUR: "€", GBP: "£", JPY: "¥",
@@ -34,6 +34,7 @@ const FALLBACK_RATES: Record<string, number> = {
   USD: 1 / 3750,
   KES: 29 / 3750, // ~0.00773
   EUR: 1 / 4050,
+  GBP: 1 / 4700,
 };
 
 export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
@@ -52,7 +53,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const res = await fetch("https://api.frankfurter.app/latest?from=UGX&to=USD,KES,EUR");
+        const res = await fetch("https://api.frankfurter.app/latest?from=UGX&to=USD,KES,EUR,GBP");
         if (!res.ok) throw new Error("Rate fetch failed");
         const data = await res.json();
         setRates({
@@ -60,6 +61,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
           USD: data.rates.USD ?? FALLBACK_RATES.USD,
           KES: data.rates.KES ?? FALLBACK_RATES.KES,
           EUR: data.rates.EUR ?? FALLBACK_RATES.EUR,
+          GBP: data.rates.GBP ?? FALLBACK_RATES.GBP,
         });
       } catch (e) {
         console.warn("Using fallback exchange rates:", e);

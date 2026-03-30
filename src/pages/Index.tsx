@@ -9,6 +9,13 @@ import SyncIndicator from "@/components/SyncIndicator";
 import HomeTab from "@/components/HomeTab";
 import PulseTab from "@/components/PulseTab";
 import AIChatAssistant from "@/components/AIChatAssistant";
+import { HamburgerMenu } from "@/components/HamburgerMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Index = () => {
   const { signOut, user } = useAuth();
@@ -34,6 +41,10 @@ const Index = () => {
   // Sync indicator dot color
   const dotColor = !isOnline ? "bg-muted-foreground" : pendingCount > 0 ? "bg-amber-500" : "bg-success";
 
+  const currencyOptions = ["UGX", "USD", "EUR", "GBP", "KES"] as const;
+  const rightLabel = displayCurrency === "UGX" ? "USD" : displayCurrency;
+  const rightSelected = displayCurrency !== "UGX";
+
   return (
     <div className="min-h-screen bg-background font-body">
       <OfflineBanner />
@@ -41,24 +52,46 @@ const Index = () => {
       {/* Minimal top header — with safe area for notch */}
       <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl px-4 flex items-center justify-between py-[35px] pb-[12px] mb-0 pt-[50px] mt-[10px] my-[5px]" style={{ paddingTop: "max(env(safe-area-inset-top, 12px), 12px)" }}>
         <div className="flex items-center gap-3">
+          <HamburgerMenu />
           <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
         </div>
         <div className="flex items-center gap-2">
           {/* Currency toggle pill */}
           <div className="flex items-center bg-card rounded-full border border-border p-0.5">
-            {(["UGX", "USD"] as const).map((c) => (
-              <button
-                key={c}
-                onClick={() => setDisplayCurrency(c)}
-                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                  displayCurrency === c
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
+            <button
+              onClick={() => setDisplayCurrency("UGX")}
+              className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                displayCurrency === "UGX"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              UGX
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`px-4 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                    rightSelected ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-label="Select currency"
+                >
+                  {rightLabel}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover border-border">
+                {currencyOptions.map((c) => (
+                  <DropdownMenuItem
+                    key={c}
+                    onClick={() => setDisplayCurrency(c)}
+                    className={displayCurrency === c ? "bg-accent text-accent-foreground" : undefined}
+                  >
+                    {c}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -82,7 +115,7 @@ const Index = () => {
       <AIChatAssistant currentScreen={activeTab} />
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[hsl(0,0%,5%)] border-t border-[hsl(0,0%,10%)]" style={{ borderTopWidth: '0.5px' }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 border-t border-border" style={{ borderTopWidth: "0.5px" }}>
         <div className="max-w-lg mx-auto flex items-center justify-around pt-2 pb-[calc(1rem+max(env(safe-area-inset-bottom),14px))] py-[5px] mb-[3px]">
           <button
             onClick={() => setActiveTab("home")}

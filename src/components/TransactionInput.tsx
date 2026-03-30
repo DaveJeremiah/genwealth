@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, Loader2, Mic, MicOff, FileText } from "lucide-react";
@@ -39,6 +39,8 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
   const [offCategory, setOffCategory] = useState("Other");
   const [offDate, setOffDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [memoText, setMemoText] = useState("");
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const toggleListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -100,6 +102,21 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     }
   };
 
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // Reset so the scrollHeight shrinks when text is deleted.
+    el.style.height = "auto";
+    const nextHeight = Math.min(el.scrollHeight, 140);
+    el.style.height = `${nextHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    resizeTextarea();
+  }, [input, isOnline, resizeTextarea]);
+
   const handleOfflineQuickSubmit = async () => {
     if (!offDesc.trim() || !offAmount || !user) return;
     const amt = parseFloat(offAmount);
@@ -145,24 +162,31 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     return (
       <div className="relative">
         <div
-          className="flex items-center rounded-full bg-card border transition-all duration-200 focus-within:border-primary/60"
+          className="flex items-start rounded-full bg-card border transition-all duration-200 focus-within:border-primary/60"
           style={{ borderWidth: '0.5px', borderColor: 'hsl(263, 83%, 58%, 0.27)' }}
         >
-          <input
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="What happened financially today?"
-            className="flex-1 bg-transparent px-5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body my-[20px] mt-0 mb-[30px]"
-            onKeyDown={(e) => { if (e.key === "Enter") handleOnlineSubmit(); }}
+            className="flex-1 bg-transparent px-5 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body resize-none overflow-hidden min-h-[44px]"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleOnlineSubmit();
+              }
+            }}
           />
           {loading ? (
-            <div className="mr-2 p-2">
+            <div className="mr-2 p-2 mt-2">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
             </div>
           ) : (
             <button
               onClick={input.trim() ? handleOnlineSubmit : toggleListening}
-              className={`mr-1.5 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              className={`mr-1.5 w-10 h-10 rounded-full flex items-center justify-center mt-2 transition-all ${
                 listening
                   ? "bg-destructive/20 text-destructive animate-pulse"
                   : "bg-primary text-primary-foreground hover:bg-violet-hover"
