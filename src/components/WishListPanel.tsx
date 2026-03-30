@@ -70,7 +70,17 @@ function priorityLabel(p: string) {
 
 const WishListPanel = () => {
   const { formatUGX, formatOriginal } = useCurrency();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: items = [], isLoading, insertItem, updateItem, deleteItem, markPurchased, isOnline } = useWishList();
+
+  const unmarkPurchased = async (id: string) => {
+    await supabase
+      .from("wish_list_items")
+      .update({ purchased: false, actual_amount_paid: null, actual_currency: null, actual_ugx_amount: null, purchase_date: null, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    queryClient.invalidateQueries({ queryKey: ["wish-list", user?.id] });
+  };
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<WishListItem | null>(null);
