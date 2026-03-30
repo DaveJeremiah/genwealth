@@ -70,27 +70,6 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
     return g;
   }, [greetingName, user?.id]);
 
-  const openNickSheet = () => {
-    setNickDraft(nickname);
-    setNickSheetOpen(true);
-  };
-
-  const saveNickname = async () => {
-    setNickSaving(true);
-    try {
-      await updateNickname(nickDraft);
-      setNickSheetOpen(false);
-      toast({ title: "Nickname saved" });
-    } catch (e: unknown) {
-      toast({
-        title: "Could not save",
-        description: e instanceof Error ? e.message : "Try again",
-        variant: "destructive",
-      });
-    } finally {
-      setNickSaving(false);
-    }
-  };
 
   const today = format(new Date(), "EEEE, MMMM d");
 
