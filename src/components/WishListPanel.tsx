@@ -293,9 +293,6 @@ const WishListPanel = () => {
                     className="mt-0.5 shrink-0 text-primary hover:text-primary/70 transition-colors"
                     aria-label="Unmark as purchased"
                   >
-                    className="mt-0.5 shrink-0 text-primary hover:text-primary/70 transition-colors"
-                    aria-label="Unmark as purchased"
-                  >
                     <CheckCircle2 className="w-5 h-5" />
                   </button>
                   <div className="flex-1 min-w-0">
