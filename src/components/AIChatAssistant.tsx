@@ -110,7 +110,7 @@ const AIChatAssistant = ({ currentScreen = "home" }: AIChatAssistantProps) => {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed right-4 z-50 w-11 h-11 rounded-full bg-primary shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-violet-hover transition-colors bottom-[calc(5.5rem+max(env(safe-area-inset-bottom),14px))]"
+          className="fixed right-4 z-50 w-11 h-11 rounded-full bg-primary shadow-lg shadow-primary/25 flex items-center justify-center hover:bg-violet-hover transition-colors bottom-[calc(8rem+max(env(safe-area-inset-bottom),14px))]"
           aria-label="Open AI Assistant"
         >
           <MessageCircle className="w-5 h-5 text-primary-foreground" />
