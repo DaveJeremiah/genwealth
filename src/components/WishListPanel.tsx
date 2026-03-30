@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
 import { MoreVertical, Check, Circle, CheckCircle2 } from "lucide-react";
 import { useWishList, type WishListItem, type WishPriority } from "@/hooks/useWishList";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
