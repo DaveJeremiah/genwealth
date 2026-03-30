@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { HamburgerMenu } from "@/components/HamburgerMenu";
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   Housing: "🏠", "Food & Dining": "🍽️", Transport: "🚗", Entertainment: "🎬",
@@ -138,6 +139,7 @@ const EntriesPage = () => {
     <div className="min-h-screen bg-background font-body">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl px-4 py-3 flex items-center gap-3">
+        <HamburgerMenu />
         <button onClick={() => navigate("/")} className="p-1.5 rounded-full hover:bg-card transition-colors">
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>

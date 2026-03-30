@@ -6,6 +6,60 @@
 
 @layer base {
   :root {
+    /* Soft light theme (not pure white) */
+    --background: 0 0% 96%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 98%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 98%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 263 83% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 222 47% 20%;
+
+    --muted: 0 0% 90%;
+    --muted-foreground: 215 16% 45%;
+
+    --accent: 263 83% 93%;
+    --accent-foreground: 263 83% 24%;
+
+    --destructive: 0 62% 38%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 86%;
+    --input: 0 0% 86%;
+    --ring: 263 83% 58%;
+
+    --radius: 1rem;
+
+    --violet: 263 83% 58%;
+    --violet-hover: 263 83% 66%;
+    --violet-glow: 263 83% 58%;
+    --success: 155 52% 55%;
+    --transfer: 210 52% 55%;
+    --surface-elevated: 0 0% 92%;
+    --tab-bar: 0 0% 90%;
+    --tab-bar-border: 0 0% 84%;
+
+    --sidebar-background: 0 0% 97%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 263 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 90%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 0 0% 86%;
+    --sidebar-ring: 263 83% 58%;
+
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .dark {
+    /* Dark theme (existing palette) */
     --background: 0 0% 4%;
     --foreground: 40 24% 92%;
 
@@ -53,8 +107,6 @@
     --sidebar-accent-foreground: 40 24% 92%;
     --sidebar-border: 0 0% 12%;
     --sidebar-ring: 263 83% 58%;
-
-    font-family: 'DM Sans', sans-serif;
   }
 }
 
