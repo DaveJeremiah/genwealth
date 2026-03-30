@@ -42,13 +42,9 @@ interface HomeTabProps {
 
 const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }: HomeTabProps) => {
   const { formatUGX } = useCurrency();
-  const { user, updateNickname } = useAuth();
-  const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [sectionTab, setSectionTab] = useState<"recent" | "statements" | "wishlist">("recent");
-  const [nickSheetOpen, setNickSheetOpen] = useState(false);
-  const [nickDraft, setNickDraft] = useState("");
-  const [nickSaving, setNickSaving] = useState(false);
 
   const nickMeta = user?.user_metadata?.nickname;
   const nickname =
