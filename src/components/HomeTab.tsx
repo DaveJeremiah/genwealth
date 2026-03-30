@@ -110,7 +110,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
               sectionTab === "recent" ? "text-violet-hover border-b-2 border-primary" : "text-muted-foreground"
             }`}
           >
-            Recent Entries
+            Entries
           </button>
           <button
             onClick={() => setSectionTab("statements")}
