@@ -1,20 +1,14 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Pencil } from "lucide-react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
 import TransactionInput from "@/components/TransactionInput";
 import StatsCards from "@/components/StatsCards";
 import FinancialStatements from "@/components/FinancialStatements";
 import TransactionLog from "@/components/TransactionLog";
 import WishListPanel from "@/components/WishListPanel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const CASUAL_GREETINGS: ((name: string) => string)[] = [
   (n) => `Sap, ${n} 👊`,
