@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { MoreVertical, Check } from "lucide-react";
+import { MoreVertical, Check, Circle, CheckCircle2 } from "lucide-react";
 import { useWishList, type WishListItem, type WishPriority } from "@/hooks/useWishList";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
@@ -203,9 +203,18 @@ const WishListPanel = () => {
               className="glass-card rounded-2xl p-4 border border-border relative"
               style={{ borderWidth: "0.5px" }}
             >
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0 pr-8">
-                  <p className="text-sm font-bold truncate" style={{ color: "#F0EDE6" }}>
+              <div className="flex items-start gap-3">
+                {/* Circular check button */}
+                <button
+                  type="button"
+                  onClick={() => openPurchase(item)}
+                  className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="Mark as purchased"
+                >
+                  <Circle className="w-5 h-5" />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold truncate text-foreground">
                     {item.item_name}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -220,7 +229,7 @@ const WishListPanel = () => {
                     <p className="text-[10px] text-muted-foreground mt-2">Target: {item.target_date}</p>
                   )}
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 pr-6">
                   <p className="text-sm font-display font-semibold text-violet-hover">
                     {formatUGX(item.estimated_ugx_amount)}
                   </p>
@@ -265,11 +274,19 @@ const WishListPanel = () => {
                 style={{ borderWidth: "0.5px" }}
               >
                 <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/30 border border-border">
-                    <Check className="w-4 h-4" style={{ color: "#444" }} />
-                  </div>
-                  <div className="flex-1 min-w-0 pr-8">
-                    <p className="text-sm font-bold truncate" style={{ color: "#444" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Unmark: update purchased back to false
+                      updateItem.mutate({ id: item.id, purchased: false, actual_amount_paid: null, actual_currency: null, actual_ugx_amount: null, purchase_date: null });
+                    }}
+                    className="mt-0.5 shrink-0 text-primary hover:text-primary/70 transition-colors"
+                    aria-label="Unmark as purchased"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate text-muted-foreground line-through">
                       {item.item_name}
                     </p>
                     <div className="flex flex-wrap gap-2 mt-1">
@@ -286,8 +303,8 @@ const WishListPanel = () => {
                       </p>
                     )}
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-display font-semibold" style={{ color: "#444" }}>
+                  <div className="text-right shrink-0 pr-6">
+                    <p className="text-sm font-display font-semibold text-muted-foreground">
                       {item.actual_ugx_amount != null ? formatUGX(item.actual_ugx_amount) : "—"}
                     </p>
                     {item.actual_amount_paid != null && (

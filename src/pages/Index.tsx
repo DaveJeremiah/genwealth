@@ -38,8 +38,8 @@ const Index = () => {
     <div className="min-h-screen bg-background font-body">
       <OfflineBanner />
 
-      {/* Minimal top header */}
-      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl px-4 py-3 flex items-center justify-between">
+      {/* Minimal top header — with safe area for notch */}
+      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl px-4 pb-3 flex items-center justify-between" style={{ paddingTop: "max(env(safe-area-inset-top, 12px), 12px)" }}>
         <div className="flex items-center gap-3">
           <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
         </div>
