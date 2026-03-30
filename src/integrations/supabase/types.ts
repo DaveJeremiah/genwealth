@@ -110,66 +110,6 @@ export type Database = {
         }
         Relationships: []
       }
-      wish_list_items: {
-        Row: {
-          id: string
-          user_id: string
-          item_name: string
-          description: string | null
-          estimated_price: number
-          currency: string
-          estimated_ugx_amount: number
-          category: string
-          priority: string
-          target_date: string | null
-          purchased: boolean
-          actual_amount_paid: number | null
-          actual_currency: string | null
-          purchase_date: string | null
-          actual_ugx_amount: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          item_name: string
-          description?: string | null
-          estimated_price: number
-          currency?: string
-          estimated_ugx_amount: number
-          category: string
-          priority: string
-          target_date?: string | null
-          purchased?: boolean
-          actual_amount_paid?: number | null
-          actual_currency?: string | null
-          purchase_date?: string | null
-          actual_ugx_amount?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          item_name?: string
-          description?: string | null
-          estimated_price?: number
-          currency?: string
-          estimated_ugx_amount?: number
-          category?: string
-          priority?: string
-          target_date?: string | null
-          purchased?: boolean
-          actual_amount_paid?: number | null
-          actual_currency?: string | null
-          purchase_date?: string | null
-          actual_ugx_amount?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
