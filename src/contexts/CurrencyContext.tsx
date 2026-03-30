@@ -32,7 +32,8 @@ export const useCurrency = () => {
 const FALLBACK_RATES: Record<string, number> = {
   UGX: 1,
   USD: 1 / 3750,
-  KES: 29 / 3750, // ~0.00773
+  // Backend fallback assumes ~29 UGX = 1 KES => 1 UGX = 1/29 KES
+  KES: 1 / 29,
   EUR: 1 / 4050,
   GBP: 1 / 4700,
 };

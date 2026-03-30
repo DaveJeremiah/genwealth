@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import UpdatePromptDialog from "@/components/UpdatePromptDialog";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
@@ -18,7 +19,7 @@ const ProtectedRoutes = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-svh flex items-center justify-center bg-background">
         <div className="w-8 h-8 rounded-2xl violet-gradient animate-pulse-violet" />
       </div>
     );
@@ -40,6 +41,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <UpdatePromptDialog />
       <BrowserRouter>
         <AuthProvider>
           <CurrencyProvider>

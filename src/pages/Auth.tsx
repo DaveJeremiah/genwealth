@@ -30,7 +30,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 font-body">
+    <div className="min-h-svh flex items-center justify-center bg-background px-4 font-body">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
