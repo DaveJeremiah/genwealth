@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Transaction, useTransactions } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Charts from "@/components/Charts";
 import WealthAnalysis from "@/components/WealthAnalysis";
 import {
-  ChevronDown, ChevronRight, MoreVertical, Plus, CalendarIcon,
+  ChevronDown, ChevronRight, MoreVertical, Plus, CalendarIcon, Headphones, Mic, Play, Pause,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
@@ -45,6 +45,632 @@ interface PulseTabProps {
 const CURRENCY_OPTIONS = ["UGX", "USD", "EUR", "GBP", "KES"];
 const ASSET_ACCOUNTS = ["Cash", "Bank", "Investments", "Crypto", "Property"];
 const LIABILITY_TYPES = ["Loans", "Mortgages", "Credit Cards", "Payday Loans", "Other"];
+const WEALTH_WIRE_STORAGE_KEY = "wealth_wire_briefings_v1";
+const WIRE_PROXY_URL =
+  (import.meta.env.VITE_WIRE_PROXY_URL as string | undefined)?.trim() ||
+  "https://wealth-wire-proxy.jenwealthy.workers.dev";
+
+type StoredBriefing = {
+  dateKey: string;
+  script: string;
+  generatedAt: string;
+};
+
+const getDateKey = (date = new Date()) => format(date, "yyyy-MM-dd");
+const ZARA_ELEVEN_VOICE_IDS = [
+  "JBFqnCBsd6RMkjVDRZzb",
+  "pFZP5JQG7iQjIQuC4Bku",
+  "FGY2WhTYpPnrIDTdsKH5",
+] as const;
+type ZaraElevenVoiceId = (typeof ZARA_ELEVEN_VOICE_IDS)[number];
+const WIRE_SELECTED_VOICE_KEY = "wealth_wire_voice_id";
+const wireAudioStorageKey = (dateKey: string, voiceId: string) => `wealth_wire_audio_${dateKey}_${voiceId}`;
+
+const formatGeneratedTime = (iso: string) =>
+  `Generated at ${new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+
+const splitSentences = (text: string) => {
+  const parts = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [];
+  let cursor = 0;
+  return parts.map((raw) => {
+    const sentence = raw;
+    const start = cursor;
+    const end = start + sentence.length;
+    cursor = end;
+    return { sentence, start, end };
+  });
+};
+
+const WealthWireCard = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [script, setScript] = useState("");
+  const [generatedAt, setGeneratedAt] = useState("");
+  const [error, setError] = useState("");
+  const [selectedSpeed, setSelectedSpeed] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(null);
+  const [briefings, setBriefings] = useState<StoredBriefing[]>([]);
+  const [fallbackNotice, setFallbackNotice] = useState<string>("");
+  const [selectedVoiceId, setSelectedVoiceId] = useState<ZaraElevenVoiceId>(() => {
+    const saved = localStorage.getItem(WIRE_SELECTED_VOICE_KEY);
+    if (saved && (ZARA_ELEVEN_VOICE_IDS as readonly string[]).includes(saved)) return saved as ZaraElevenVoiceId;
+    return ZARA_ELEVEN_VOICE_IDS[0];
+  });
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechQueueRef = useRef<{ idx: number; cancelled: boolean }>({ idx: 0, cancelled: false });
+  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const sentenceStartTimesRef = useRef<number[]>([]);
+
+  const sentences = useMemo(() => splitSentences(script), [script]);
+  const hasScript = script.trim().length > 0;
+
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+    [],
+  );
+
+  const stopPlayback = () => {
+    if (typeof window === "undefined") return;
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+    setActiveSentenceIndex(null);
+    utteranceRef.current = null;
+    speechQueueRef.current = { idx: 0, cancelled: true };
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const cleanupAudioUrl = () => {
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+  };
+
+  const pruneOldWireAudioCache = () => {
+    const today = getDateKey();
+    const prefix = "wealth_wire_audio_";
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefix)) continue;
+      // keys are wealth_wire_audio_${dateKey}_${voiceId}
+      const rest = k.slice(prefix.length);
+      const dateKey = rest.slice(0, 10);
+      if (dateKey !== today) localStorage.removeItem(k);
+    }
+  };
+
+  const startWebSpeechFallback = () => {
+    if (!hasScript || typeof window === "undefined") return;
+    const synth = window.speechSynthesis;
+
+    // Voice ranking (best-effort, varies by OS/browser).
+    const scoreVoice = (v: SpeechSynthesisVoice) => {
+      let score = 0;
+      const name = (v.name || "").toLowerCase();
+      const lang = (v.lang || "").toLowerCase();
+      const local = (v as unknown as { localService?: boolean }).localService;
+
+      if (lang === "en-us") score += 50;
+      else if (lang.startsWith("en-")) score += 30;
+
+      if (local) score += 10;
+      if (name.includes("google")) score += 8;
+      if (name.includes("microsoft")) score += 6;
+      if (name.includes("natural")) score += 6;
+
+      const femaleHints = ["female", "samantha", "zira", "karen", "moira", "victoria"];
+      if (femaleHints.some((h) => name.includes(h))) score += 12;
+
+      return score;
+    };
+
+    const pickBestVoice = () => {
+      const voices = synth.getVoices();
+      if (!voices.length) return null;
+      return [...voices].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] || null;
+    };
+
+    selectedVoiceRef.current = pickBestVoice();
+    speechQueueRef.current = { idx: 0, cancelled: false };
+
+    const speakNext = () => {
+      const q = speechQueueRef.current;
+      if (q.cancelled) return;
+      if (q.idx >= sentences.length) {
+        setIsPlaying(false);
+        setIsPaused(false);
+        setActiveSentenceIndex(null);
+        utteranceRef.current = null;
+        return;
+      }
+
+      const currentIdx = q.idx;
+      const text = sentences[currentIdx]?.sentence?.trim();
+      if (!text) {
+        q.idx += 1;
+        speakNext();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-US";
+      utterance.voice = selectedVoiceRef.current || undefined;
+      utterance.rate = selectedSpeed;
+      utterance.pitch = 1.05;
+      utterance.volume = 1;
+
+      utterance.onstart = () => {
+        setIsPlaying(true);
+        setIsPaused(false);
+        setActiveSentenceIndex(currentIdx);
+      };
+
+      utterance.onend = () => {
+        q.idx += 1;
+        speakNext();
+      };
+
+      utterance.onerror = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+        setActiveSentenceIndex(null);
+        utteranceRef.current = null;
+        setError("Playback failed on this browser.");
+      };
+
+      utteranceRef.current = utterance;
+      synth.speak(utterance);
+    };
+
+    speakNext();
+  };
+
+  useEffect(() => {
+    try {
+      pruneOldWireAudioCache();
+      const raw = localStorage.getItem(WEALTH_WIRE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as StoredBriefing[];
+      if (!Array.isArray(parsed)) return;
+      const cleaned = parsed
+        .filter((item) => item?.dateKey && item?.script && item?.generatedAt)
+        .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+        .slice(0, 7);
+      setBriefings(cleaned);
+
+      const todaysEntry = cleaned.find((entry) => entry.dateKey === getDateKey());
+      if (todaysEntry) {
+        setScript(todaysEntry.script);
+        setGeneratedAt(todaysEntry.generatedAt);
+      }
+    } catch {
+      // Ignore storage parse failures and continue with empty state.
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopPlayback();
+      cleanupAudioUrl();
+    };
+  }, []);
+
+  useEffect(() => {
+    stopPlayback();
+    cleanupAudioUrl();
+  }, [script]);
+
+  useEffect(() => {
+    localStorage.setItem(WIRE_SELECTED_VOICE_KEY, selectedVoiceId);
+  }, [selectedVoiceId]);
+
+  useEffect(() => {
+    // If voice changes, stop playback and clear highlight; audio can be regenerated/cached per-voice.
+    stopPlayback();
+    cleanupAudioUrl();
+    setFallbackNotice("");
+  }, [selectedVoiceId]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = selectedSpeed;
+    }
+  }, [selectedSpeed]);
+
+  const persistBriefing = (next: StoredBriefing) => {
+    const merged = [next, ...briefings.filter((item) => item.dateKey !== next.dateKey)]
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+      .slice(0, 7);
+    setBriefings(merged);
+    localStorage.setItem(WEALTH_WIRE_STORAGE_KEY, JSON.stringify(merged));
+  };
+
+  const generateBriefing = async () => {
+    setIsLoading(true);
+    setError("");
+    stopPlayback();
+    try {
+      if (!WIRE_PROXY_URL) {
+        throw new Error("Wire proxy URL missing. Set VITE_WIRE_PROXY_URL in .env.");
+      }
+      const response = await fetch(WIRE_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateKey: getDateKey() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Wire proxy request failed.");
+      }
+      const nextScript = data.script || "";
+      if (!nextScript.trim()) {
+        throw new Error("No script was returned.");
+      }
+      const generatedAtIso = new Date().toISOString();
+      setScript(nextScript);
+      setGeneratedAt(generatedAtIso);
+      persistBriefing({ dateKey: getDateKey(), script: nextScript, generatedAt: generatedAtIso });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate briefing.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (!hasScript || typeof window === "undefined") return;
+    setFallbackNotice("");
+
+    // Prefer ElevenLabs audio if available/loaded.
+    const audio = audioRef.current;
+    if (audio) {
+      if (!audio.paused && isPlaying) {
+        audio.pause();
+        setIsPaused(true);
+        return;
+      }
+      if (audio.paused && isPaused) {
+        audio.play().catch(() => {});
+        setIsPaused(false);
+        return;
+      }
+    }
+
+    const synth = window.speechSynthesis;
+    if (synth.speaking && !synth.paused && isPlaying) {
+      synth.pause();
+      setIsPaused(true);
+      return;
+    }
+
+    if (synth.paused && isPaused) {
+      synth.resume();
+      setIsPaused(false);
+      return;
+    }
+
+    stopPlayback();
+    // Fetch ElevenLabs audio + timestamps via Worker.
+    (async () => {
+      try {
+        const todayKey = getDateKey();
+        const cacheKey = wireAudioStorageKey(todayKey, selectedVoiceId);
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw) as {
+            audio_base64?: string;
+            alignment?: { character_start_times_seconds?: number[] };
+            normalized_alignment?: { character_start_times_seconds?: number[] };
+            createdAtISO?: string;
+          };
+          if (cached?.audio_base64) {
+            cleanupAudioUrl();
+            const bytes = Uint8Array.from(atob(String(cached.audio_base64)), (c) => c.charCodeAt(0));
+            const blob = new Blob([bytes], { type: "audio/mpeg" });
+            const url = URL.createObjectURL(blob);
+            audioUrlRef.current = url;
+
+            const audioEl = new Audio(url);
+            audioEl.playbackRate = selectedSpeed;
+            audioRef.current = audioEl;
+
+            const startTimes = cached?.alignment?.character_start_times_seconds || cached?.normalized_alignment?.character_start_times_seconds || [];
+            sentenceStartTimesRef.current = sentences.map((s) => startTimes[s.start] ?? 0);
+
+            const updateHighlight = () => {
+              const t = audioEl.currentTime;
+              const starts = sentenceStartTimesRef.current;
+              let idx = 0;
+              for (let i = 0; i < starts.length; i += 1) {
+                if (t >= starts[i]) idx = i;
+                else break;
+              }
+              setActiveSentenceIndex(Number.isFinite(idx) ? idx : null);
+            };
+
+            audioEl.ontimeupdate = updateHighlight;
+            audioEl.onplay = () => {
+              setIsPlaying(true);
+              setIsPaused(false);
+            };
+            audioEl.onpause = () => {
+              if (audioEl.currentTime > 0 && audioEl.currentTime < audioEl.duration) setIsPaused(true);
+            };
+            audioEl.onended = () => {
+              setIsPlaying(false);
+              setIsPaused(false);
+              setActiveSentenceIndex(null);
+            };
+
+            await audioEl.play();
+            return;
+          }
+        }
+
+        const ttsUrl = `${WIRE_PROXY_URL.replace(/\/$/, "")}/tts`;
+        let data: {
+          audio_base64?: string;
+          alignment?: { character_start_times_seconds?: number[] };
+          normalized_alignment?: { character_start_times_seconds?: number[] };
+        } | null = null;
+        let lastError: string | null = null;
+
+        // If user selected a voice, try it first, then fall back to others.
+        const voiceTryOrder = [selectedVoiceId, ...ZARA_ELEVEN_VOICE_IDS.filter((v) => v !== selectedVoiceId)];
+        for (const voiceId of voiceTryOrder) {
+          const response = await fetch(ttsUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: script,
+              voice_id: voiceId,
+              output_format: "mp3_44100_128",
+              model_id: "eleven_multilingual_v2",
+              voice_settings: {
+                stability: 0.35,
+                similarity_boost: 0.8,
+                style: 0.35,
+                use_speaker_boost: true,
+              },
+            }),
+          });
+          const maybe = (await response.json()) as {
+            audio_base64?: string;
+            alignment?: { character_start_times_seconds?: number[] };
+            normalized_alignment?: { character_start_times_seconds?: number[] };
+            error?: unknown;
+          };
+          if (response.ok && maybe?.audio_base64) {
+            data = maybe;
+            break;
+          }
+          lastError = typeof maybe?.error === "string" ? maybe.error : JSON.stringify(maybe?.error || maybe);
+        }
+
+        if (!data) {
+          throw new Error(lastError || "ElevenLabs TTS failed.");
+        }
+
+        // Cache today's audio for the selected voice (replay won't spend credits).
+        try {
+          localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              audio_base64: data.audio_base64,
+              alignment: data.alignment,
+              normalized_alignment: data.normalized_alignment,
+              createdAtISO: new Date().toISOString(),
+            }),
+          );
+        } catch {
+          // If storage is full, we still allow playback; replay just won't be cached.
+        }
+
+        cleanupAudioUrl();
+
+        const audioBase64 = String(data.audio_base64 || "");
+        if (!audioBase64) throw new Error("No audio returned.");
+
+        const bytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: "audio/mpeg" });
+        const url = URL.createObjectURL(blob);
+        audioUrlRef.current = url;
+
+        const audioEl = new Audio(url);
+        audioEl.playbackRate = selectedSpeed;
+        audioRef.current = audioEl;
+
+        // Map sentence start char index -> start time seconds using ElevenLabs alignment.
+        const alignment = (data.alignment || data.normalized_alignment) as {
+          character_start_times_seconds?: number[];
+        } | null;
+        const startTimes = alignment?.character_start_times_seconds || [];
+        sentenceStartTimesRef.current = sentences.map((s) => startTimes[s.start] ?? 0);
+
+        const updateHighlight = () => {
+          const t = audioEl.currentTime;
+          const starts = sentenceStartTimesRef.current;
+          let idx = 0;
+          for (let i = 0; i < starts.length; i += 1) {
+            if (t >= starts[i]) idx = i;
+            else break;
+          }
+          setActiveSentenceIndex(Number.isFinite(idx) ? idx : null);
+        };
+
+        audioEl.ontimeupdate = updateHighlight;
+        audioEl.onplay = () => {
+          setIsPlaying(true);
+          setIsPaused(false);
+        };
+        audioEl.onpause = () => {
+          if (audioEl.currentTime > 0 && audioEl.currentTime < audioEl.duration) setIsPaused(true);
+        };
+        audioEl.onended = () => {
+          setIsPlaying(false);
+          setIsPaused(false);
+          setActiveSentenceIndex(null);
+        };
+
+        await audioEl.play();
+      } catch (e) {
+        setFallbackNotice("ElevenLabs voice unavailable — using device voice instead.");
+        startWebSpeechFallback();
+      }
+    })();
+  };
+
+  const loadBriefing = (entry: StoredBriefing) => {
+    stopPlayback();
+    setScript(entry.script);
+    setGeneratedAt(entry.generatedAt);
+    setError("");
+  };
+
+  return (
+    <section className="glass-card rounded-3xl p-5 space-y-4 border border-primary/20">
+      <div>
+        <h2 className="font-display text-2xl text-violet-hover">The Wealth Wire</h2>
+        <p className="text-xs text-muted-foreground italic mt-1">Your daily financial briefing by Zara</p>
+      </div>
+
+      <button
+        onClick={generateBriefing}
+        disabled={isLoading}
+        className={`w-full rounded-full py-3 px-5 text-sm font-semibold transition-all ${
+          isLoading
+            ? "bg-primary/80 text-primary-foreground animate-pulse"
+            : "bg-primary text-primary-foreground hover:bg-violet-hover"
+        }`}
+      >
+        {isLoading ? "Zara is reading the news..." : "Get today's briefing"}
+      </button>
+
+      {isLoading && (
+        <div className="space-y-2 py-1">
+          <div className="flex justify-center items-end gap-1.5 h-10">
+            <span className="w-2 rounded-full bg-primary/70 animate-pulse h-4" />
+            <span className="w-2 rounded-full bg-primary animate-pulse h-8 [animation-delay:120ms]" />
+            <span className="w-2 rounded-full bg-primary/80 animate-pulse h-6 [animation-delay:220ms]" />
+          </div>
+          <p className="text-center text-xs text-muted-foreground italic">Zara is on it...</p>
+        </div>
+      )}
+
+      {!isLoading && !hasScript && (
+        <div className="glass-card rounded-2xl p-5 text-center space-y-3">
+          <div className="mx-auto w-14 h-14 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+            <Mic className="w-6 h-6 text-violet-hover" />
+          </div>
+          <p className="text-sm text-muted-foreground italic">
+            Zara hasn&apos;t read the news yet today. Tap to get your briefing.
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {!isLoading && hasScript && (
+        <>
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-violet-hover">Today&apos;s briefing</p>
+            <div className="glass-card rounded-2xl p-4 border border-primary/15">
+              <div className="text-[15px] leading-[1.8] font-display text-[#999999]">
+                {sentences.map((item, index) => (
+                  <span
+                    key={`${item.start}-${index}`}
+                    className={activeSentenceIndex === index ? "text-violet-hover transition-colors" : ""}
+                  >
+                    {item.sentence}
+                  </span>
+                ))}
+              </div>
+              {generatedAt && <p className="text-xs text-muted-foreground mt-4">{formatGeneratedTime(generatedAt)}</p>}
+            </div>
+          </div>
+
+          <div className="glass-card rounded-2xl p-3 border border-primary/20 flex items-center gap-3">
+            <button
+              onClick={handlePlayPause}
+              className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-violet-hover transition-colors"
+              aria-label={isPlaying && !isPaused ? "Pause briefing" : "Play briefing"}
+            >
+              {isPlaying && !isPaused ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-foreground truncate">The Wealth Wire — {todayLabel}</p>
+              {fallbackNotice && <p className="text-[11px] text-muted-foreground mt-0.5">{fallbackNotice}</p>}
+            </div>
+            <select
+              value={selectedVoiceId}
+              onChange={(e) => setSelectedVoiceId(e.target.value as (typeof ZARA_ELEVEN_VOICE_IDS)[number])}
+              className="bg-card border border-border rounded-full px-2.5 py-1.5 text-xs text-muted-foreground focus:outline-none"
+              aria-label="Select voice"
+              title="Select voice"
+            >
+              <option value={ZARA_ELEVEN_VOICE_IDS[0]}>Voice 1 (Male)</option>
+              <option value={ZARA_ELEVEN_VOICE_IDS[1]}>Voice 2 (British Female)</option>
+              <option value={ZARA_ELEVEN_VOICE_IDS[2]}>Voice 3 (American Female)</option>
+            </select>
+            <select
+              value={selectedSpeed}
+              onChange={(e) => setSelectedSpeed(Number(e.target.value))}
+              className="bg-card border border-border rounded-full px-2.5 py-1.5 text-xs text-violet-hover focus:outline-none"
+            >
+              <option value={0.75}>0.75x</option>
+              <option value={1}>1x</option>
+              <option value={1.25}>1.25x</option>
+              <option value={1.5}>1.5x</option>
+            </select>
+          </div>
+        </>
+      )}
+
+      {briefings.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Previous briefings</h3>
+          <div className="flex flex-wrap gap-2">
+            {briefings.map((entry) => (
+              <button
+                key={entry.dateKey}
+                onClick={() => loadBriefing(entry)}
+                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                  generatedAt === entry.generatedAt
+                    ? "bg-primary/20 border-primary/40 text-violet-hover"
+                    : "bg-card border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {format(new Date(`${entry.dateKey}T00:00:00`), "MMM d")}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between border-t border-border pt-1" style={{ borderTopWidth: "0.5px" }}>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Wire</span>
+        <Headphones className="w-4 h-4 text-violet-hover" />
+      </div>
+    </section>
+  );
+};
 
 const PulseTab = ({ transactions, stats }: PulseTabProps) => {
   const { formatUGX, convertFromUGX } = useCurrency();
@@ -58,6 +684,8 @@ const PulseTab = ({ transactions, stats }: PulseTabProps) => {
 
   return (
     <div className="space-y-6 pt-2">
+      <WealthWireCard />
+
       {/* Net Worth Chart */}
       <Charts transactions={transactions} />
 
