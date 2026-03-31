@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
-import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronLeft, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
@@ -27,18 +27,33 @@ const FinancialStatements = ({ transactions }: Props) => {
   const { formatUGX } = useCurrency();
   const [subTab, setSubTab] = useState<"pnl" | "balance" | "cashflow">("pnl");
   const monthOptions = useMemo(getMonthOptions, []);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
 
   const fmt = (n: number) => formatUGX(Math.abs(n));
 
-  const filterThisMonth = (txns: Transaction[]) => {
-    const start = monthOptions[0]?.start;
-    const end = monthOptions[0]?.end;
+  const filterSelectedMonth = (txns: Transaction[]) => {
+    const start = monthOptions[selectedMonthIndex]?.start;
+    const end = monthOptions[selectedMonthIndex]?.end;
     if (!start || !end) return txns;
     return txns.filter((t) => t.date >= start && t.date <= end);
   };
 
-  const filtered = filterThisMonth(transactions);
+  const filtered = filterSelectedMonth(transactions);
+  const monthStart = monthOptions[selectedMonthIndex]?.start;
+  const monthEnd = monthOptions[selectedMonthIndex]?.end;
+
+  const sumByAccount = (txns: Transaction[]) => {
+    const map: Record<string, number> = {};
+    txns.forEach((t) => {
+      const key = (t.account || t.category || "Other").trim();
+      map[key] = (map[key] || 0) + t.ugx_amount;
+    });
+    return map;
+  };
+
+  const mergeKeys = (a: Record<string, number>, b: Record<string, number>) =>
+    Array.from(new Set([...Object.keys(a), ...Object.keys(b)])).sort((x, y) => x.localeCompare(y));
 
   const toggleCat = (cat: string) => {
     setExpandedCats((prev) => {
@@ -73,16 +88,52 @@ const FinancialStatements = ({ transactions }: Props) => {
   }, [filtered]);
 
   const balanceSheet = useMemo(() => {
-    const assets = transactions.filter((t) => t.type === "asset");
-    const liabilities = transactions.filter((t) => t.type === "liability");
-    const assByCat: Record<string, number> = {};
-    const liaByCat: Record<string, number> = {};
-    assets.forEach((t) => { assByCat[t.account || t.category] = (assByCat[t.account || t.category] || 0) + t.ugx_amount; });
-    liabilities.forEach((t) => { liaByCat[t.account || t.category] = (liaByCat[t.account || t.category] || 0) + t.ugx_amount; });
-    const totalAssets = assets.reduce((s, t) => s + t.ugx_amount, 0);
-    const totalLiabilities = liabilities.reduce((s, t) => s + t.ugx_amount, 0);
-    return { assByCat, liaByCat, totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
-  }, [transactions]);
+    const start = monthStart;
+    const end = monthEnd;
+    if (!start || !end) {
+      return {
+        openingAssetsByAccount: {},
+        openingLiabilitiesByAccount: {},
+        closingAssetsByAccount: {},
+        closingLiabilitiesByAccount: {},
+        totalAssets: 0,
+        totalLiabilities: 0,
+        netWorth: 0,
+      };
+    }
+
+    const assetsBefore = transactions.filter((t) => t.type === "asset" && t.date < start);
+    const liabilitiesBefore = transactions.filter((t) => t.type === "liability" && t.date < start);
+    const assetsInMonth = transactions.filter((t) => t.type === "asset" && t.date >= start && t.date <= end);
+    const liabilitiesInMonth = transactions.filter((t) => t.type === "liability" && t.date >= start && t.date <= end);
+
+    const openingAssetsByAccount = sumByAccount(assetsBefore);
+    const openingLiabilitiesByAccount = sumByAccount(liabilitiesBefore);
+    const deltaAssetsByAccount = sumByAccount(assetsInMonth);
+    const deltaLiabilitiesByAccount = sumByAccount(liabilitiesInMonth);
+
+    const closingAssetsByAccount: Record<string, number> = {};
+    const closingLiabilitiesByAccount: Record<string, number> = {};
+    mergeKeys(openingAssetsByAccount, deltaAssetsByAccount).forEach((k) => {
+      closingAssetsByAccount[k] = (openingAssetsByAccount[k] || 0) + (deltaAssetsByAccount[k] || 0);
+    });
+    mergeKeys(openingLiabilitiesByAccount, deltaLiabilitiesByAccount).forEach((k) => {
+      closingLiabilitiesByAccount[k] = (openingLiabilitiesByAccount[k] || 0) + (deltaLiabilitiesByAccount[k] || 0);
+    });
+
+    const totalAssets = Object.values(closingAssetsByAccount).reduce((s, n) => s + n, 0);
+    const totalLiabilities = Object.values(closingLiabilitiesByAccount).reduce((s, n) => s + n, 0);
+
+    return {
+      openingAssetsByAccount,
+      openingLiabilitiesByAccount,
+      closingAssetsByAccount,
+      closingLiabilitiesByAccount,
+      totalAssets,
+      totalLiabilities,
+      netWorth: totalAssets - totalLiabilities,
+    };
+  }, [transactions, monthStart, monthEnd]);
 
   const cashFlow = useMemo(() => {
     const income = filtered.filter((t) => t.type === "income");
@@ -138,6 +189,27 @@ const FinancialStatements = ({ transactions }: Props) => {
 
   return (
     <div className="space-y-4">
+      {/* Month selector (similar to Entries) */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setSelectedMonthIndex((i) => Math.min(monthOptions.length - 1, i + 1))}
+          className="p-2 rounded-full hover:bg-card transition-colors"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+        </button>
+        <span className="text-sm font-medium text-foreground">
+          {monthOptions[selectedMonthIndex]?.label || "This month"}
+        </span>
+        <button
+          onClick={() => setSelectedMonthIndex((i) => Math.max(0, i - 1))}
+          className="p-2 rounded-full hover:bg-card transition-colors"
+          aria-label="Next month"
+        >
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </div>
+
       {/* Sub-tab pills */}
       <div className="flex gap-2">
         {subTabs.map((t) => (
@@ -207,17 +279,29 @@ const FinancialStatements = ({ transactions }: Props) => {
       {subTab === "balance" && (
         <div className="space-y-3">
           <SectionLabel>What You Own</SectionLabel>
-          {Object.entries(balanceSheet.assByCat).map(([cat, amt]) => (
-            <StatRow key={cat} label={cat} amount={fmt(amt)} color="text-violet-hover" />
+          {Object.entries(balanceSheet.closingAssetsByAccount).map(([cat, closing]) => (
+            <div key={cat} className="space-y-0.5">
+              <StatRow label={cat} amount={fmt(closing)} color="text-violet-hover" />
+              <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+                <span>Opening</span>
+                <span>{fmt(balanceSheet.openingAssetsByAccount[cat] || 0)}</span>
+              </div>
+            </div>
           ))}
-          {Object.keys(balanceSheet.assByCat).length === 0 && <EmptyRow />}
+          {Object.keys(balanceSheet.closingAssetsByAccount).length === 0 && <EmptyRow />}
           <TotalRow label="Total Assets" amount={fmt(balanceSheet.totalAssets)} color="text-violet-hover" />
 
           <SectionLabel>What You Owe</SectionLabel>
-          {Object.entries(balanceSheet.liaByCat).map(([cat, amt]) => (
-            <StatRow key={cat} label={cat} amount={fmt(amt)} color="text-destructive" />
+          {Object.entries(balanceSheet.closingLiabilitiesByAccount).map(([cat, closing]) => (
+            <div key={cat} className="space-y-0.5">
+              <StatRow label={cat} amount={fmt(closing)} color="text-destructive" />
+              <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+                <span>Opening</span>
+                <span>{fmt(balanceSheet.openingLiabilitiesByAccount[cat] || 0)}</span>
+              </div>
+            </div>
           ))}
-          {Object.keys(balanceSheet.liaByCat).length === 0 && <EmptyRow />}
+          {Object.keys(balanceSheet.closingLiabilitiesByAccount).length === 0 && <EmptyRow />}
           <TotalRow label="Total Liabilities" amount={fmt(balanceSheet.totalLiabilities)} color="text-destructive" />
 
           <Divider />
