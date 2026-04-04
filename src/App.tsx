@@ -11,7 +11,9 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import EntriesPage from "./pages/EntriesPage";
+import SettingsPage from "./pages/SettingsPage";
 import NicknamePrompt from "@/components/NicknamePrompt";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,7 @@ const ProtectedRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/entries" element={<EntriesPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
@@ -49,9 +52,11 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <CurrencyProvider>
-            <OfflineProvider>
-              <ProtectedRoutes />
-            </OfflineProvider>
+            <SettingsProvider>
+              <OfflineProvider>
+                <ProtectedRoutes />
+              </OfflineProvider>
+            </SettingsProvider>
           </CurrencyProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -9,6 +9,7 @@ import StatsCards from "@/components/StatsCards";
 import FinancialStatements from "@/components/FinancialStatements";
 import TransactionLog from "@/components/TransactionLog";
 import WishListPanel from "@/components/WishListPanel";
+import { useSettings } from "@/contexts/SettingsContext";
 
 const CASUAL_GREETINGS: ((name: string) => string)[] = [
   (n) => `Sap, ${n} 👊`,
@@ -44,14 +45,18 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
   const { formatUGX } = useCurrency();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [sectionTab, setSectionTab] = useState<"recent" | "statements" | "wishlist">("recent");
 
-  const nickMeta = user?.user_metadata?.nickname;
-  const nickname =
-    nickMeta != null && String(nickMeta).trim() !== "" ? String(nickMeta).trim() : "";
-  const greetingName = nickname || displayName;
+  const greetingName = settings.nickname || displayName;
 
-  const casualGreeting = useMemo(() => {
+  const greeting = useMemo(() => {
+    if (settings.greeting_style === "formal") {
+      const h = new Date().getHours();
+      const time = h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
+      return `Good ${time}, ${greetingName}.`;
+    }
+
     const uid = user?.id ?? "guest";
     const key = `jenwealthy_greet_${uid}_${greetingName}`;
     try {
@@ -68,9 +73,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       /* ignore */
     }
     return g;
-  }, [greetingName, user?.id]);
-
-
+  }, [greetingName, user?.id, settings.greeting_style]);
   const today = format(new Date(), "EEEE, MMMM d");
 
   return (
@@ -79,7 +82,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       <div>
         <p className="text-sm text-muted-foreground">{today}</p>
         <h1 className="text-2xl font-display font-bold text-foreground mt-1">
-          {casualGreeting}
+          {greeting}
         </h1>
       </div>
 
@@ -88,10 +91,9 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
 
       {/* 2x2 Stats Grid */}
       <StatsCards
-        netWorth={stats.netWorth}
-        cashFlow={stats.income - stats.expenses}
-        savingsRate={stats.savingsRate}
-        totalIncome={stats.income}
+        stats={stats}
+        showWealthScore={settings.show_wealth_score}
+        fourthStatCard={settings.fourth_stat_card}
       />
 
       {/* AI Insight Card */}

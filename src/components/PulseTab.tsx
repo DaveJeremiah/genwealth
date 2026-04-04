@@ -57,14 +57,14 @@ type StoredBriefing = {
 };
 
 const getDateKey = (date = new Date()) => format(date, "yyyy-MM-dd");
-const ZARA_ELEVEN_VOICE_IDS = [
-  "JBFqnCBsd6RMkjVDRZzb",
-  "pFZP5JQG7iQjIQuC4Bku",
-  "FGY2WhTYpPnrIDTdsKH5",
+const ZARA_AZURE_VOICES = [
+  { id: "en-US-AriaNeural", label: "Aria (US Female)" },
+  { id: "en-GB-SoniaNeural", label: "Sonia (British Female)" },
+  { id: "en-US-JennyNeural", label: "Jenny (Warm US Female)" },
 ] as const;
-type ZaraElevenVoiceId = (typeof ZARA_ELEVEN_VOICE_IDS)[number];
-const WIRE_SELECTED_VOICE_KEY = "wealth_wire_voice_id";
-const wireAudioStorageKey = (dateKey: string, voiceId: string) => `wealth_wire_audio_${dateKey}_${voiceId}`;
+type ZaraVoiceId = (typeof ZARA_AZURE_VOICES)[number]["id"];
+const WIRE_SELECTED_VOICE_KEY = "wealth_wire_voice_id_azure";
+const wireAudioStorageKey = (dateKey: string, voiceId: string) => `wealth_wire_audio_az_${dateKey}_${voiceId}`;
 
 const formatGeneratedTime = (iso: string) =>
   `Generated at ${new Date(iso).toLocaleTimeString("en-US", {
@@ -95,11 +95,37 @@ const WealthWireCard = () => {
   const [activeSentenceIndex, setActiveSentenceIndex] = useState<number | null>(null);
   const [briefings, setBriefings] = useState<StoredBriefing[]>([]);
   const [fallbackNotice, setFallbackNotice] = useState<string>("");
-  const [selectedVoiceId, setSelectedVoiceId] = useState<ZaraElevenVoiceId>(() => {
+  const [selectedVoiceId, setSelectedVoiceId] = useState<ZaraVoiceId>(() => {
     const saved = localStorage.getItem(WIRE_SELECTED_VOICE_KEY);
-    if (saved && (ZARA_ELEVEN_VOICE_IDS as readonly string[]).includes(saved)) return saved as ZaraElevenVoiceId;
-    return ZARA_ELEVEN_VOICE_IDS[0];
+    const ids = ZARA_AZURE_VOICES.map(v => v.id) as readonly string[];
+    if (saved && ids.includes(saved)) return saved as ZaraVoiceId;
+    return ZARA_AZURE_VOICES[0].id;
   });
+
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(() => {
+    try { const s = localStorage.getItem("wire_topics"); return s ? JSON.parse(s) : ["finance"]; } catch { return ["finance"]; }
+  });
+  const [selectedRegion, setSelectedRegion] = useState<string>(() => {
+    return localStorage.getItem("wire_region") || "global";
+  });
+
+  const toggleTopic = (topic: string) => {
+    setSelectedTopics(prev => {
+      let next: string[];
+      if (prev.includes(topic)) {
+        next = prev.length > 1 ? prev.filter(t => t !== topic) : prev; // must keep at least 1
+      } else {
+        next = prev.length < 3 ? [...prev, topic] : prev; // max 3
+      }
+      localStorage.setItem("wire_topics", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleRegionChange = (region: string) => {
+    setSelectedRegion(region);
+    localStorage.setItem("wire_region", region);
+  };
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const speechQueueRef = useRef<{ idx: number; cancelled: boolean }>({ idx: 0, cancelled: false });
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
@@ -313,7 +339,7 @@ const WealthWireCard = () => {
       const response = await fetch(WIRE_PROXY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dateKey: getDateKey() }),
+        body: JSON.stringify({ dateKey: getDateKey(), topics: selectedTopics, region: selectedRegion }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -338,16 +364,23 @@ const WealthWireCard = () => {
     if (!hasScript || typeof window === "undefined") return;
     setFallbackNotice("");
 
+    // Synchronously create/unlock audio for iOS Safari
+    if (!audioRef.current) {
+      const unlockAudio = new Audio();
+      unlockAudio.play().catch(() => {});
+      audioRef.current = unlockAudio;
+    }
+    const audioEl = audioRef.current;
+
     // Prefer ElevenLabs audio if available/loaded.
-    const audio = audioRef.current;
-    if (audio) {
-      if (!audio.paused && isPlaying) {
-        audio.pause();
+    if (audioUrlRef.current) {
+      if (!audioEl.paused && isPlaying) {
+        audioEl.pause();
         setIsPaused(true);
         return;
       }
-      if (audio.paused && isPaused) {
-        audio.play().catch(() => {});
+      if (audioEl.paused && isPaused) {
+        audioEl.play().catch(() => {});
         setIsPaused(false);
         return;
       }
@@ -387,9 +420,9 @@ const WealthWireCard = () => {
             const url = URL.createObjectURL(blob);
             audioUrlRef.current = url;
 
-            const audioEl = new Audio(url);
+            audioEl.src = url;
+            audioEl.load();
             audioEl.playbackRate = selectedSpeed;
-            audioRef.current = audioEl;
 
             const startTimes = cached?.alignment?.character_start_times_seconds || cached?.normalized_alignment?.character_start_times_seconds || [];
             sentenceStartTimesRef.current = sentences.map((s) => startTimes[s.start] ?? 0);
@@ -419,54 +452,46 @@ const WealthWireCard = () => {
               setActiveSentenceIndex(null);
             };
 
+            await new Promise<void>((resolve, reject) => {
+              audioEl.oncanplaythrough = () => resolve();
+              audioEl.onerror = () => reject(new Error("Audio load error from cache"));
+              setTimeout(() => resolve(), 3000); // safety timeout
+            });
             await audioEl.play();
             return;
           }
         }
 
-        const ttsUrl = `${WIRE_PROXY_URL.replace(/\/$/, "")}/tts`;
-        let data: {
+        // Call Azure TTS via worker proxy
+        const ttsUrl = `${WIRE_PROXY_URL.replace(/\/$/, "")}/azure-tts`;
+        const speedRateMap: Record<number, string> = {
+          0.75: "-25%",
+          1: "0%",
+          1.25: "+25%",
+          1.5: "+50%",
+        };
+        const rate = speedRateMap[selectedSpeed] ?? "0%";
+
+        const response = await fetch(ttsUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: script,
+            voice_name: selectedVoiceId,
+            rate,
+          }),
+        });
+
+        const maybe = (await response.json()) as {
           audio_base64?: string;
-          alignment?: { character_start_times_seconds?: number[] };
-          normalized_alignment?: { character_start_times_seconds?: number[] };
-        } | null = null;
-        let lastError: string | null = null;
+          error?: string;
+        };
 
-        // If user selected a voice, try it first, then fall back to others.
-        const voiceTryOrder = [selectedVoiceId, ...ZARA_ELEVEN_VOICE_IDS.filter((v) => v !== selectedVoiceId)];
-        for (const voiceId of voiceTryOrder) {
-          const response = await fetch(ttsUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: script,
-              voice_id: voiceId,
-              output_format: "mp3_44100_128",
-              model_id: "eleven_multilingual_v2",
-              voice_settings: {
-                stability: 0.35,
-                similarity_boost: 0.8,
-                style: 0.35,
-                use_speaker_boost: true,
-              },
-            }),
-          });
-          const maybe = (await response.json()) as {
-            audio_base64?: string;
-            alignment?: { character_start_times_seconds?: number[] };
-            normalized_alignment?: { character_start_times_seconds?: number[] };
-            error?: unknown;
-          };
-          if (response.ok && maybe?.audio_base64) {
-            data = maybe;
-            break;
-          }
-          lastError = typeof maybe?.error === "string" ? maybe.error : JSON.stringify(maybe?.error || maybe);
+        if (!response.ok || !maybe?.audio_base64) {
+          throw new Error(maybe?.error || "Azure TTS failed");
         }
 
-        if (!data) {
-          throw new Error(lastError || "ElevenLabs TTS failed.");
-        }
+        const data = { audio_base64: maybe.audio_base64 };
 
         // Cache today's audio for the selected voice (replay won't spend credits).
         try {
@@ -474,8 +499,6 @@ const WealthWireCard = () => {
             cacheKey,
             JSON.stringify({
               audio_base64: data.audio_base64,
-              alignment: data.alignment,
-              normalized_alignment: data.normalized_alignment,
               createdAtISO: new Date().toISOString(),
             }),
           );
@@ -493,16 +516,12 @@ const WealthWireCard = () => {
         const url = URL.createObjectURL(blob);
         audioUrlRef.current = url;
 
-        const audioEl = new Audio(url);
-        audioEl.playbackRate = selectedSpeed;
-        audioRef.current = audioEl;
+        audioEl.src = url;
+        audioEl.load();
+        audioEl.playbackRate = 1; // Speed handled by SSML rate in Azure
 
-        // Map sentence start char index -> start time seconds using ElevenLabs alignment.
-        const alignment = (data.alignment || data.normalized_alignment) as {
-          character_start_times_seconds?: number[];
-        } | null;
-        const startTimes = alignment?.character_start_times_seconds || [];
-        sentenceStartTimesRef.current = sentences.map((s) => startTimes[s.start] ?? 0);
+        // Azure doesn't return character alignment — approximate highlight by distributing evenly
+        sentenceStartTimesRef.current = sentences.map((_, i) => i * 3); // rough 3s/sentence estimate
 
         const updateHighlight = () => {
           const t = audioEl.currentTime;
@@ -529,9 +548,16 @@ const WealthWireCard = () => {
           setActiveSentenceIndex(null);
         };
 
+        await new Promise<void>((resolve, reject) => {
+          audioEl.oncanplaythrough = () => resolve();
+          audioEl.onerror = () => reject(new Error("Audio load error"));
+          setTimeout(() => resolve(), 3000); // safety timeout
+        });
         await audioEl.play();
       } catch (e) {
-        setFallbackNotice("ElevenLabs voice unavailable — using device voice instead.");
+        const errMsg = e instanceof Error ? e.message : String(e);
+        console.error("[WealthWire] TTS error:", errMsg);
+        setFallbackNotice(`Audio unavailable (${errMsg}) — using device voice.`);
         startWebSpeechFallback();
       }
     })();
@@ -546,9 +572,41 @@ const WealthWireCard = () => {
 
   return (
     <section className="glass-card rounded-3xl p-5 space-y-4 border border-primary/20">
-      <div>
-        <h2 className="font-display text-2xl text-violet-hover">The Wealth Wire</h2>
-        <p className="text-xs text-muted-foreground italic mt-1">Your daily financial briefing by Zara</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-display text-2xl text-violet-hover">The Wealth Wire</h2>
+          <p className="text-xs text-muted-foreground italic mt-1">Your daily briefing by Zara</p>
+        </div>
+        {/* Region */}
+        <select
+          value={selectedRegion}
+          onChange={e => handleRegionChange(e.target.value)}
+          className="bg-card border border-border rounded-full px-2.5 py-1.5 text-xs text-muted-foreground focus:outline-none mt-1"
+        >
+          <option value="global">🌍 Global</option>
+          <option value="africa">🌍 Africa</option>
+          <option value="europe">🇪🇺 Europe</option>
+          <option value="americas">🌎 Americas</option>
+          <option value="asia">🌏 Asia-Pacific</option>
+        </select>
+      </div>
+
+      {/* Topic chips */}
+      <div className="flex flex-wrap gap-2">
+        {(["finance", "tech", "environment", "business", "world"] as const).map(topic => (
+          <button
+            key={topic}
+            onClick={() => toggleTopic(topic)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+              selectedTopics.includes(topic)
+                ? "bg-primary/20 border-primary/50 text-violet-hover"
+                : "bg-card border-border text-muted-foreground hover:border-primary/30"
+            }`}
+          >
+            {topic === "finance" ? "💰 Finance" : topic === "tech" ? "⚡️ Tech" : topic === "environment" ? "🌿 Environment" : topic === "business" ? "📈 Business" : "🌐 World"}
+          </button>
+        ))}
+        <span className="text-[10px] text-muted-foreground/60 self-center">Pick up to 3</span>
       </div>
 
       <button
@@ -592,7 +650,7 @@ const WealthWireCard = () => {
           <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-[0.22em] text-violet-hover">Today&apos;s briefing</p>
             <div className="glass-card rounded-2xl p-4 border border-primary/15">
-              <div className="text-[15px] leading-[1.8] font-display text-[#999999]">
+              <div className="text-[15px] leading-[1.8] font-display text-[#999999] max-h-[135px] overflow-y-auto pr-2 pb-2 scrollbar-hide">
                 {sentences.map((item, index) => (
                   <span
                     key={`${item.start}-${index}`}
@@ -620,14 +678,14 @@ const WealthWireCard = () => {
             </div>
             <select
               value={selectedVoiceId}
-              onChange={(e) => setSelectedVoiceId(e.target.value as (typeof ZARA_ELEVEN_VOICE_IDS)[number])}
+              onChange={(e) => setSelectedVoiceId(e.target.value as ZaraVoiceId)}
               className="bg-card border border-border rounded-full px-2.5 py-1.5 text-xs text-muted-foreground focus:outline-none"
               aria-label="Select voice"
               title="Select voice"
             >
-              <option value={ZARA_ELEVEN_VOICE_IDS[0]}>Voice 1 (Male)</option>
-              <option value={ZARA_ELEVEN_VOICE_IDS[1]}>Voice 2 (British Female)</option>
-              <option value={ZARA_ELEVEN_VOICE_IDS[2]}>Voice 3 (American Female)</option>
+              {ZARA_AZURE_VOICES.map(v => (
+                <option key={v.id} value={v.id}>{v.label}</option>
+              ))}
             </select>
             <select
               value={selectedSpeed}

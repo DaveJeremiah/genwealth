@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, format, subMonths, addMonths } from "date-fns";
 import { ChevronDown, ChevronRight, ChevronLeft, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -21,6 +21,59 @@ const getMonthOptions = () => {
     });
   }
   return months;
+};
+
+const calculateOpeningBalance = (txns: Transaction[], upToDate: string) => {
+  const sorted = txns.filter(t => t.date < upToDate).sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.id.localeCompare(b.id);
+  });
+  
+  let balance = 0;
+  for (const t of sorted) {
+    const desc = t.description?.toLowerCase() || '';
+    const acc = t.account?.toLowerCase() || '';
+    const amt = t.ugx_amount || 0;
+    
+    if (t.type === 'income') {
+      balance += Number(amt);
+    } else if (t.type === 'expense') {
+      balance -= Number(amt);
+    } else if ((t.type === 'liability' && desc.includes('loan repayment')) || (t.type === 'transfer-out' && desc.includes('repayment'))) {
+      balance -= Math.abs(Number(amt));
+    } else if (t.type === 'asset' && desc.includes('loan received')) {
+      balance += Math.abs(Number(amt));
+    } else if (t.type === 'asset' && (acc.includes('cash') || acc.includes('bank'))) {
+      balance += Number(amt);
+    }
+  }
+  return balance;
+};
+
+const calculateClosingBalance = (txns: Transaction[], monthStart: string, monthEnd: string, opening: number) => {
+  const monthTxns = txns.filter(t => t.date >= monthStart && t.date <= monthEnd);
+  
+  let incomeOnly = 0;
+  let expenseOnly = 0;
+  let loansReceived = 0;
+  let loanRepayments = 0;
+  
+  for (const t of monthTxns) {
+    const desc = t.description?.toLowerCase() || "";
+    const amt = t.ugx_amount || 0;
+    
+    if (t.type === "income") {
+      incomeOnly += Number(amt);
+    } else if (t.type === "expense") {
+      expenseOnly += Number(amt);
+    } else if (t.type === "asset" && desc.includes("loan received")) {
+      loansReceived += Math.abs(Number(amt));
+    } else if ((t.type === "liability" && desc.includes("loan repayment")) || (t.type === "transfer-out" && desc.includes("repayment"))) {
+      loanRepayments += Math.abs(Number(amt));
+    }
+  }
+  const netLoans = loansReceived - loanRepayments;
+  return opening + incomeOnly - expenseOnly + netLoans;
 };
 
 const FinancialStatements = ({ transactions }: Props) => {
@@ -156,17 +209,22 @@ const FinancialStatements = ({ transactions }: Props) => {
     const netOperating = totalIncome - totalExpenses;
 
     const financingLoanAsset = filtered.filter(
-      (t) =>
-        t.type === "asset" &&
-        (/Loan received/i.test(t.description) || /Credit used/i.test(t.description))
+      (t) => t.type === "asset" && /loan received/i.test(t.description)
     );
-    const financingLiabilityRepay = filtered.filter((t) => t.type === "liability" && t.ugx_amount < 0);
-    const financingRows = [...financingLoanAsset, ...financingLiabilityRepay].sort((a, b) => {
+    const financingLiabilityRepay = filtered.filter(
+      (t) => (t.type === "liability" && /loan repayment/i.test(t.description)) || 
+             (t.type === "transfer-out" && /repayment/i.test(t.description))
+    );
+    const financingRows = [
+      ...financingLoanAsset.map(t => ({...t, ugx_amount: Math.abs(t.ugx_amount || 0)})),
+      ...financingLiabilityRepay.map(t => ({...t, ugx_amount: -Math.abs(t.ugx_amount || 0)}))
+    ].sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return a.id.localeCompare(b.id);
     });
 
-    const netFinancing = financingRows.reduce((s, t) => s + t.ugx_amount, 0);
+    const netFinancing = financingLoanAsset.reduce((s, t) => s + Math.abs(t.ugx_amount || 0), 0) -
+                         financingLiabilityRepay.reduce((s, t) => s + Math.abs(t.ugx_amount || 0), 0);
     const netCashPosition = netOperating + netFinancing;
 
     return {
@@ -180,6 +238,51 @@ const FinancialStatements = ({ transactions }: Props) => {
       netCashPosition,
     };
   }, [filtered]);
+
+  const ytdPnl = useMemo(() => {
+    if (!monthStart || !monthEnd) return { income: 0, expense: 0, net: 0, savingsRate: 0 };
+    const yearStart = `${monthStart.slice(0, 4)}-01-01`;
+    const ytdTxns = transactions.filter(t => t.date >= yearStart && t.date <= monthEnd);
+    const ytdIncome = ytdTxns.filter(t => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
+    const ytdExpense = ytdTxns.filter(t => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
+    const ytdNet = ytdIncome - ytdExpense;
+    const savingsRate = ytdIncome > 0 ? ((ytdIncome - ytdExpense) / ytdIncome) * 100 : 0;
+    return { income: ytdIncome, expense: ytdExpense, net: ytdNet, savingsRate };
+  }, [transactions, monthStart, monthEnd]);
+
+  const cfOpeningBalance = useMemo(() => {
+    if (!monthStart) return 0;
+    return calculateOpeningBalance(transactions, monthStart);
+  }, [transactions, monthStart]);
+
+  useEffect(() => {
+    if (!transactions || transactions.length === 0) return;
+    
+    console.log("--- Cash Flow Continuity Validation ---");
+    const chronologicalMonths = [...monthOptions].reverse();
+    
+    for (let i = 1; i < chronologicalMonths.length; i++) {
+        const prevMonth = chronologicalMonths[i-1];
+        const currMonth = chronologicalMonths[i];
+        
+        const prevOpen = calculateOpeningBalance(transactions, prevMonth.start);
+        const prevClose = calculateClosingBalance(transactions, prevMonth.start, prevMonth.end, prevOpen);
+        const currOpen = calculateOpeningBalance(transactions, currMonth.start);
+        
+        if (Math.abs(prevClose - currOpen) > 0.01) {
+            console.error(`Discrepancy found! Prev Month (${prevMonth.label}) Closing: ${prevClose} | Curr Month (${currMonth.label}) Opening: ${currOpen}. Diff: ${currOpen - prevClose}`);
+        } else {
+            console.log(`Verified continuity from ${prevMonth.label} to ${currMonth.label}`);
+        }
+    }
+    console.log("--- Validation Complete ---");
+  }, [transactions, monthOptions]);
+
+  const nextMonthName = useMemo(() => {
+    if (!monthStart) return "";
+    const [y, m, d] = monthStart.split('-');
+    return format(addMonths(new Date(Number(y), Number(m) - 1, Number(d)), 1), "MMMM");
+  }, [monthStart]);
 
   const subTabs = [
     { key: "pnl" as const, label: "P&L" },
@@ -272,6 +375,23 @@ const FinancialStatements = ({ transactions }: Props) => {
               {fmt(pnlData.profit)}
             </span>
           </div>
+
+          <Divider />
+          <div className="pt-1 space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Year to Date</p>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Cumulative Net (YTD)</span>
+              <span className={`text-sm font-medium ${ytdPnl.net >= 0 ? "text-success" : "text-destructive"}`}>
+                {formatUGX(ytdPnl.net)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Savings Rate (YTD)</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {Math.round(ytdPnl.savingsRate)}% of income saved this year.
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -317,6 +437,27 @@ const FinancialStatements = ({ transactions }: Props) => {
       {/* Cash Flow */}
       {subTab === "cashflow" && (
         <div className="space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-border mb-1 mt-1" style={{ borderBottomWidth: "0.5px" }}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-[#F0EDE6]">Opening Balance</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-full p-0.5 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    aria-label="About opening balance"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+                  This is what you started the month with. Your P&L shows how you performed this month. Your closing balance shows what you&apos;re carrying forward.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <span className="text-sm font-medium text-[#F0EDE6]">{formatUGX(cfOpeningBalance)}</span>
+          </div>
+
           <SectionLabel>Operating — Money In</SectionLabel>
           {cashFlow.incomeGroups.length === 0 && <EmptyRow />}
           {cashFlow.incomeGroups.map(([cat, { total, items }]) => (
@@ -423,6 +564,18 @@ const FinancialStatements = ({ transactions }: Props) => {
                 {formatUGX(cashFlow.netCashPosition)}
               </span>
             </div>
+          </div>
+
+          <div className="py-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[20px] font-display font-bold text-[#9D5FF0]">Closing Balance</span>
+              <span className="text-[20px] font-display font-bold text-[#9D5FF0]">
+                {formatUGX(cfOpeningBalance + cashFlow.netCashPosition)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 text-right">
+              This carries into {nextMonthName}.
+            </p>
           </div>
         </div>
       )}
