@@ -62,7 +62,7 @@ const Auth = () => {
             <h1 className="text-3xl font-display font-bold violet-text">Jenwealthy</h1>
           </div>
           <p className="text-sm" style={{ color: '#999' }}>
-            Income is not wealth. Ownership is.
+            Wealth generation starts with accountability.
           </p>
         </div>
 
@@ -74,7 +74,7 @@ const Auth = () => {
             {!isLogin && (
               <Input
                 type="text"
-                placeholder="Nickname (used in greetings)"
+                placeholder="Nickname"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 className="bg-card border-border text-foreground placeholder:text-muted-foreground rounded-xl"
