@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import EntriesPage from "./pages/EntriesPage";
+import NicknamePrompt from "@/components/NicknamePrompt";
 
 const queryClient = new QueryClient();
 
