@@ -70,10 +70,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     root.style.setProperty("--violet", hsl);
     root.style.setProperty("--violet-glow", hsl);
     
-    // Calculate a hover version (roughly slightly lighter/more saturated)
-    // We can just rely on standard tailwind classes or do a manual adjustment if needed.
-    // For simplicity, we just use the same HSL for primary but maybe higher lightness for hover if we wanted.
-    // But since the CSS defines --violet-hover manually, we can set it to a slightly higher lightness.
     const [h, s, l] = hsl.split(" ").map(v => parseFloat(v));
     root.style.setProperty("--violet-hover", `${h} ${s}% ${Math.min(l + 8, 100)}%`);
 
@@ -89,65 +85,102 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       setLoading(true);
       try {
-        const key = `wealthos_settings_${user.id}`;
-        const saved = localStorage.getItem(key);
+        // 1. Try to fetch from Supabase
+        const { data, error } = await supabase
+          .from("user_settings")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const loadedSettings = {
-            ...DEFAULT_SETTINGS,
-            ...parsed,
-          };
-          setSettings(loadedSettings);
-          setDisplayCurrency(loadedSettings.default_currency as "UGX" | "USD" | "EUR" | "GBP" | "KES");
+        if (error) throw error;
+
+        if (data) {
+          // Found in DB
+          setSettings({ 
+            ...DEFAULT_SETTINGS, 
+            ...data,
+            greeting_style: (data.greeting_style === "formal" ? "formal" : "casual") as "casual" | "formal"
+          });
+          if (data.default_currency) {
+            setDisplayCurrency(data.default_currency as any);
+          }
         } else {
-          // Create default row for user using email as base nickname default
-          const baseNickname = user.email ? user.email.split("@")[0] : "there";
-          const newSettings = {
-            ...DEFAULT_SETTINGS,
-            nickname: baseNickname.charAt(0).toUpperCase() + baseNickname.slice(1),
-            user_id: user.id
-          };
+          // Not in DB, check if we have local settings to migrate
+          const localKey = `wealthos_settings_${user.id}`;
+          const localSaved = localStorage.getItem(localKey);
           
-          localStorage.setItem(key, JSON.stringify(newSettings));
-          setSettings(newSettings as unknown as UserSettings);
-          setDisplayCurrency(newSettings.default_currency as "UGX" | "USD" | "EUR" | "GBP" | "KES");
+          let initialSettings = DEFAULT_SETTINGS;
+          
+          if (localSaved) {
+            try {
+              const parsed = JSON.parse(localSaved);
+              initialSettings = { ...DEFAULT_SETTINGS, ...parsed };
+            } catch (e) {
+              console.warn("Failed to parse local settings during migration:", e);
+            }
+          } else {
+            // No local settings, use defaults
+            const baseNickname = user.email ? user.email.split("@")[0] : "User";
+            initialSettings = {
+              ...DEFAULT_SETTINGS,
+              nickname: baseNickname.charAt(0).toUpperCase() + baseNickname.slice(1),
+            };
+          }
+
+          // Create row in Supabase
+          const { error: insertError } = await supabase
+            .from("user_settings")
+            .insert([{ ...initialSettings, user_id: user.id }]);
+
+          if (insertError) {
+            console.error("Failed to initialize remote settings:", insertError);
+          }
+
+          setSettings(initialSettings);
+          if (initialSettings.default_currency) {
+            setDisplayCurrency(initialSettings.default_currency as any);
+          }
         }
       } catch (e) {
-        console.error("Failed to load settings:", e);
+        console.error("Failed to load settings from Supabase:", e);
+        toast.error("Cloud settings unavailable, using defaults.");
       } finally {
         setLoading(false);
       }
     };
 
     loadSettings();
-  }, [user]); // We do NOT put setDisplayCurrency in dependency array
+  }, [user, setDisplayCurrency]);
 
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
     if (!user) return false;
     
-    // Optimistic update
+    // Optimistic UI update
     setSettings(prev => ({ ...prev, ...updates }));
     
     if (updates.default_currency) {
-      setDisplayCurrency(updates.default_currency as "UGX" | "USD" | "EUR" | "GBP" | "KES");
+      setDisplayCurrency(updates.default_currency as any);
     }
     
     try {
-      const key = `wealthos_settings_${user.id}`;
-      // Get latest state directly rather than assuming `settings` is fresh to avoid race condition
-      const currentSavedStr = localStorage.getItem(key);
-      const currentSaved = currentSavedStr ? JSON.parse(currentSavedStr) : DEFAULT_SETTINGS;
-      const newSaved = { ...currentSaved, ...updates };
+      const { error } = await supabase
+        .from("user_settings")
+        .update(updates)
+        .eq("user_id", user.id);
 
-      localStorage.setItem(key, JSON.stringify(newSaved));
+      if (error) throw error;
+      
+      // Also update local cache for faster next load
+      const localKey = `wealthos_settings_${user.id}`;
+      localStorage.setItem(localKey, JSON.stringify({ ...settings, ...updates }));
+      
       return true;
     } catch (e) {
-      console.error("Error updating settings:", e);
-      toast.error("Failed to save settings locally");
+      console.error("Error updating settings on Supabase:", e);
+      toast.error("Failed to sync settings to cloud");
       return false;
     }
-  }, [user, setDisplayCurrency]);
+  }, [user, setDisplayCurrency, settings]);
 
   return (
     <SettingsContext.Provider value={{ settings, updateSettings, loading }}>

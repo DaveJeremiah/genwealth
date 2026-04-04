@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Loader2, Mic, MicOff, FileText } from "lucide-react";
+import { Send, Loader2, Mic, MicOff, FileText, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +27,8 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const { addTransactions } = useTransactions();
   const { toast } = useToast();
@@ -79,6 +81,79 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
     recognition.start();
     setListening(true);
   }, [listening, input, memoText, toast, isOnline]);
+
+  const handleImageScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || scanning) return;
+
+    setScanning(true);
+    try {
+      // 1. Compress and Convert to base64
+      const compressedBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let width = img.width;
+            let height = img.height;
+            const max = 1024;
+
+            // Resize if too large
+            if (width > height && width > max) {
+              height *= max / width;
+              width = max;
+            } else if (height > max) {
+              width *= max / height;
+              height = max;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            // Compress as JPEG (0.7 quality)
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            resolve(dataUrl.split(",")[1]);
+          };
+          img.onerror = reject;
+          img.src = event.target?.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // 2. Call Edge Function with compressed image
+      const { data, error } = await supabase.functions.invoke("parse-transactions", {
+        body: { image: compressedBase64 },
+      });
+
+      if (error) throw error;
+      
+      // The function returns { text: "..." } for a scan-only request
+      if (data && data.text) {
+        // "Type" it into the box
+        setInput(data.text);
+        toast({ title: "Scan complete", description: "Details extracted. Please review and send." });
+      } else if (data && data.error) {
+        throw new Error(data.error);
+      } else {
+        throw new Error("The scanner couldn't find any details in this image. Try a clearer photo.");
+      }
+    } catch (error: any) {
+      console.error("Scan error details:", error);
+      // Show the actual error message so we can debug
+      toast({ 
+        title: "Scan error", 
+        description: error.message || "Something went wrong with the cloud scanner.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleOnlineSubmit = async () => {
     if (!input.trim() || loading) return;
@@ -167,10 +242,11 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
         >
           <textarea
             ref={textareaRef}
-            value={input}
+            value={scanning ? "Scanning receipt details..." : input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="What happened financially today?"
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body resize-none overflow-hidden min-h-[44px] px-[20px] py-[20px]"
+            disabled={scanning}
+            placeholder={scanning ? "Analyzing image..." : "What happened financially today?"}
+            className={`flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none font-body resize-none overflow-hidden min-h-[44px] px-[20px] py-[20px] ${scanning ? "animate-pulse italic opacity-70" : ""}`}
             rows={1}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -179,21 +255,43 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
               }
             }}
           />
-          {loading ? (
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageScan}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+          />
+          {scanning ? (
+            <div className="mr-2 p-2 mt-2">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            </div>
+          ) : loading ? (
             <div className="mr-2 p-2 mt-2">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
             </div>
           ) : (
-            <button
-              onClick={input.trim() ? handleOnlineSubmit : toggleListening}
-              className={`mr-1.5 w-10 h-10 rounded-full flex items-center justify-center mt-2 transition-all ${
-                listening
-                  ? "bg-destructive/20 text-destructive animate-pulse"
-                  : "bg-primary text-primary-foreground hover:bg-violet-hover"
-              }`}
-            >
-              {listening ? <MicOff className="w-4 h-4" /> : input.trim() ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </button>
+            <div className="flex items-center mt-2 mr-1.5 gap-1">
+              {!input.trim() && !listening && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={input.trim() ? handleOnlineSubmit : toggleListening}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  listening
+                    ? "bg-destructive/20 text-destructive animate-pulse"
+                    : "bg-primary text-primary-foreground hover:bg-violet-hover"
+                }`}
+              >
+                {listening ? <MicOff className="w-4 h-4" /> : input.trim() ? <Send className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
           )}
         </div>
       </div>

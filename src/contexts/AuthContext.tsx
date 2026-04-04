@@ -21,9 +21,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      // Smart Sync: If we just signed in and have a pending nickname from the signup form
+      if (event === "SIGNED_IN" && currentUser) {
+        const pendingNickname = localStorage.getItem("wealthos_pending_nickname");
+        if (pendingNickname) {
+          console.log("Applying pending nickname from signup:", pendingNickname);
+          
+          // 1. Update User Metadata (Auth)
+          await supabase.auth.updateUser({
+            data: { nickname: pendingNickname }
+          });
+
+          // 2. Update/Upsert User Settings Table
+          // Use upsert to handle both new and existing users
+          await supabase.from("user_settings").upsert({
+            user_id: currentUser.id,
+            nickname: pendingNickname,
+          }, { onConflict: 'user_id' });
+
+          // 3. Clear the pending flag
+          localStorage.removeItem("wealthos_pending_nickname");
+          
+          // 4. Force a refresh of settings if the provider is already loaded
+          window.location.reload(); 
+        }
+      }
+      
       setLoading(false);
     });
 
