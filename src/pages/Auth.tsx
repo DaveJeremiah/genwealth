@@ -9,6 +9,7 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nickname, setNickname] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -35,7 +36,12 @@ const Auth = () => {
       if (isLogin) {
         await signIn(email, password);
       } else {
-        await signUp(email, password);
+        if (!nickname.trim()) {
+          toast({ title: "Nickname required", description: "Please enter a nickname.", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+        await signUp(email, password, nickname);
         toast({ title: "Account created", description: "Check your email to confirm your account." });
       }
     } catch (error: any) {
@@ -65,6 +71,17 @@ const Auth = () => {
             {isLogin ? "Welcome back" : "Create your account"}
           </h2>
           <div className="space-y-3">
+            {!isLogin && (
+              <Input
+                type="text"
+                placeholder="Nickname (used in greetings)"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className="bg-card border-border text-foreground placeholder:text-muted-foreground rounded-xl"
+                required={!isLogin}
+                maxLength={30}
+              />
+            )}
             <Input
               type="email"
               placeholder="Email"
