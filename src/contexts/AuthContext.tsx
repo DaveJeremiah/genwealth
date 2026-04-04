@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, nickname?: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** Persists to Supabase user_metadata; empty string removes nickname (greeting falls back to email name). */
   updateNickname: (nickname: string) => Promise<void>;
@@ -41,11 +41,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, nickname?: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: nickname ? { nickname: nickname.trim() } : undefined,
+      },
     });
     if (error) throw error;
   };

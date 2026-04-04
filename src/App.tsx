@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import EntriesPage from "./pages/EntriesPage";
+import NicknamePrompt from "@/components/NicknamePrompt";
 
 const queryClient = new QueryClient();
 
@@ -28,11 +29,14 @@ const ProtectedRoutes = () => {
   if (!user) return <Auth />;
 
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/entries" element={<EntriesPage />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <NicknamePrompt />
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/entries" element={<EntriesPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 };
 
