@@ -29,11 +29,14 @@ const ProtectedRoutes = () => {
   if (!user) return <Auth />;
 
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/entries" element={<EntriesPage />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <NicknamePrompt />
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/entries" element={<EntriesPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 };
 
