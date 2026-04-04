@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { TrendingUp } from "lucide-react";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
