@@ -78,7 +78,15 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: "Extract financial transactions to JSON: {transactions: [], insight: ''}" },
+          { role: "system", content: `Extract financial transactions from user input. Today is ${new Date().toISOString().split("T")[0]}.
+Rules:
+- date MUST be YYYY-MM-DD format. Use today's date if not specified.
+- type MUST be one of: income, expense, asset, liability, transfer-in, transfer-out
+- category MUST be one of: Housing, Food & Dining, Transport, Entertainment, Health, Shopping, Utilities, Investments, Crypto, Property, Salary, Freelance, Business, Savings, Transfer, Other
+- currency: use exactly what user says (UGX, USD, EUR, GBP, KES, BTC, ETH, SOL). Default UGX.
+- ugx_amount: if currency is UGX, same as amount. Otherwise estimate UGX equivalent.
+- account: Cash, Bank, Mobile Money, or as specified.
+- insight: one-sentence summary.` },
           { role: "user", content: input }
         ],
         tools: [{
@@ -88,7 +96,7 @@ Deno.serve(async (req) => {
             parameters: {
               type: "object",
               properties: {
-                transactions: { type: "array", items: { type: "object", properties: { id: {type:"string"}, date: {type:"string"}, description: {type:"string"}, amount: {type:"number"}, currency: {type:"string"}, type: {type:"string"}, category: {type:"string"}, account: {type:"string"} }, required: ["id", "date", "description", "amount", "currency", "type", "category", "account"] } },
+                transactions: { type: "array", items: { type: "object", properties: { id: {type:"string"}, date: {type:"string"}, description: {type:"string"}, amount: {type:"number"}, currency: {type:"string"}, ugx_amount: {type:"number"}, type: {type:"string"}, category: {type:"string"}, account: {type:"string"} }, required: ["id", "date", "description", "amount", "currency", "ugx_amount", "type", "category", "account"] } },
                 insight: { type: "string" }
               },
               required: ["transactions", "insight"]
