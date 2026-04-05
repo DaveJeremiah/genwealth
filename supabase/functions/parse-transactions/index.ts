@@ -78,7 +78,15 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: "Extract financial transactions to JSON: {transactions: [], insight: ''}" },
+          { role: "system", content: `Extract financial transactions from user input. Today is ${new Date().toISOString().split("T")[0]}.
+Rules:
+- date MUST be YYYY-MM-DD format. Use today's date if not specified.
+- type MUST be one of: income, expense, asset, liability, transfer-in, transfer-out
+- category MUST be one of: Housing, Food & Dining, Transport, Entertainment, Health, Shopping, Utilities, Investments, Crypto, Property, Salary, Freelance, Business, Savings, Transfer, Other
+- currency: use exactly what user says (UGX, USD, EUR, GBP, KES, BTC, ETH, SOL). Default UGX.
+- ugx_amount: if currency is UGX, same as amount. Otherwise estimate UGX equivalent.
+- account: Cash, Bank, Mobile Money, or as specified.
+- insight: one-sentence summary.` },
           { role: "user", content: input }
         ],
         tools: [{
@@ -88,7 +96,7 @@ Deno.serve(async (req) => {
             parameters: {
               type: "object",
               properties: {
-                transactions: { type: "array", items: { type: "object", properties: { id: {type:"string"}, date: {type:"string"}, description: {type:"string"}, amount: {type:"number"}, currency: {type:"string"}, type: {type:"string"}, category: {type:"string"}, account: {type:"string"} }, required: ["id", "date", "description", "amount", "currency", "type", "category", "account"] } },
+                transactions: { type: "array", items: { type: "object", properties: { id: {type:"string"}, date: {type:"string"}, description: {type:"string"}, amount: {type:"number"}, currency: {type:"string"}, ugx_amount: {type:"number"}, type: {type:"string"}, category: {type:"string"}, account: {type:"string"} }, required: ["id", "date", "description", "amount", "currency", "ugx_amount", "type", "category", "account"] } },
                 insight: { type: "string" }
               },
               required: ["transactions", "insight"]
@@ -102,7 +110,42 @@ Deno.serve(async (req) => {
     const data = await response.json();
     const parsed = JSON.parse(data.choices?.[0]?.message?.tool_calls?.[0].function.arguments);
 
-    return new Response(JSON.stringify({ transactions: parsed.transactions, insight: parsed.insight }), {
+    const today = new Date().toISOString().split("T")[0];
+    const validTypes = ["income", "expense", "asset", "liability", "transfer-in", "transfer-out"];
+    const categoryMap: Record<string, string> = {
+      "food": "Food & Dining", "dining": "Food & Dining", "food & dining": "Food & Dining",
+      "transport": "Transport", "transportation": "Transport",
+      "housing": "Housing", "health": "Health", "shopping": "Shopping",
+      "utilities": "Utilities", "investments": "Investments", "crypto": "Crypto",
+      "property": "Property", "salary": "Salary", "freelance": "Freelance",
+      "business": "Business", "savings": "Savings", "transfer": "Transfer",
+      "entertainment": "Entertainment", "other": "Other",
+    };
+
+    const normalized = parsed.transactions.map((t: any) => {
+      // Fix date
+      let date = t.date;
+      if (!date || date === "today" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        date = today;
+      }
+      // Fix type
+      const type = validTypes.includes(t.type?.toLowerCase()) ? t.type.toLowerCase() : "expense";
+      // Fix category
+      const cat = categoryMap[t.category?.toLowerCase()] || t.category || "Other";
+      // Fix account
+      const account = t.account ? t.account.charAt(0).toUpperCase() + t.account.slice(1) : "Cash";
+      
+      return {
+        ...t,
+        date,
+        type,
+        category: cat,
+        account,
+        ugx_amount: t.ugx_amount || (t.currency === "UGX" ? t.amount : t.amount),
+      };
+    });
+
+    return new Response(JSON.stringify({ transactions: normalized, insight: parsed.insight }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
