@@ -110,7 +110,42 @@ Rules:
     const data = await response.json();
     const parsed = JSON.parse(data.choices?.[0]?.message?.tool_calls?.[0].function.arguments);
 
-    return new Response(JSON.stringify({ transactions: parsed.transactions, insight: parsed.insight }), {
+    const today = new Date().toISOString().split("T")[0];
+    const validTypes = ["income", "expense", "asset", "liability", "transfer-in", "transfer-out"];
+    const categoryMap: Record<string, string> = {
+      "food": "Food & Dining", "dining": "Food & Dining", "food & dining": "Food & Dining",
+      "transport": "Transport", "transportation": "Transport",
+      "housing": "Housing", "health": "Health", "shopping": "Shopping",
+      "utilities": "Utilities", "investments": "Investments", "crypto": "Crypto",
+      "property": "Property", "salary": "Salary", "freelance": "Freelance",
+      "business": "Business", "savings": "Savings", "transfer": "Transfer",
+      "entertainment": "Entertainment", "other": "Other",
+    };
+
+    const normalized = parsed.transactions.map((t: any) => {
+      // Fix date
+      let date = t.date;
+      if (!date || date === "today" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        date = today;
+      }
+      // Fix type
+      const type = validTypes.includes(t.type?.toLowerCase()) ? t.type.toLowerCase() : "expense";
+      // Fix category
+      const cat = categoryMap[t.category?.toLowerCase()] || t.category || "Other";
+      // Fix account
+      const account = t.account ? t.account.charAt(0).toUpperCase() + t.account.slice(1) : "Cash";
+      
+      return {
+        ...t,
+        date,
+        type,
+        category: cat,
+        account,
+        ugx_amount: t.ugx_amount || (t.currency === "UGX" ? t.amount : t.amount),
+      };
+    });
+
+    return new Response(JSON.stringify({ transactions: normalized, insight: parsed.insight }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
