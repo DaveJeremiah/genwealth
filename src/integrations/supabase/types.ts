@@ -170,60 +170,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_settings: {
-        Row: {
-          id: string
-          user_id: string
-          nickname: string | null
-          default_currency: string | null
-          greeting_style: string | null
-          profile_accent: string | null
-          financial_year_start: number | null
-          default_account: string | null
-          show_wealth_score: boolean | null
-          fourth_stat_card: string | null
-          briefing_reminder: boolean | null
-          briefing_reminder_time: string | null
-          auto_generate_briefing: boolean | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          nickname?: string | null
-          default_currency?: string | null
-          greeting_style?: string | null
-          profile_accent?: string | null
-          financial_year_start?: number | null
-          default_account?: string | null
-          show_wealth_score?: boolean | null
-          fourth_stat_card?: string | null
-          briefing_reminder?: boolean | null
-          briefing_reminder_time?: string | null
-          auto_generate_briefing?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          nickname?: string | null
-          default_currency?: string | null
-          greeting_style?: string | null
-          profile_accent?: string | null
-          financial_year_start?: number | null
-          default_account?: string | null
-          show_wealth_score?: boolean | null
-          fourth_stat_card?: string | null
-          briefing_reminder?: boolean | null
-          briefing_reminder_time?: string | null
-          auto_generate_briefing?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
