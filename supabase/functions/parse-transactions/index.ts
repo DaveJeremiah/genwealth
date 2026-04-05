@@ -40,7 +40,17 @@ Deno.serve(async (req) => {
             {
               role: "user",
               content: [
-                { type: "text", text: "Summarize this receipt in one short sentence (e.g. 'Coffee 15k'). If not a receipt, say 'Invalid scan'." },
+                { type: "text", text: `Extract ALL financial details from this receipt/document. Today is ${new Date().toISOString().split("T")[0]}.
+Return a detailed description including:
+- Each item/service with its price
+- Total amount paid
+- Currency (default UGX if not shown)
+- Date (use today if not visible)
+- Vendor/store name if visible
+- Payment method if visible
+
+Format as a natural sentence like: "Paid 45,000 UGX at Café Javas on 2026-04-05 for coffee (12,000), sandwich (18,000), juice (15,000) via Mobile Money"
+If this is not a receipt or financial document, say 'Invalid scan: not a financial document'.` },
                 {
                   type: "image_url",
                   image_url: { url: `data:image/jpeg;base64,${image}` }
