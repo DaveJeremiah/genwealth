@@ -195,14 +195,7 @@ const FinancialStatements = ({ transactions }: Props) => {
     const netOperating = totalIncome - totalExpenses;
 
     // Financing: all loan-related transactions (by category or type)
-    const isLoanRelated = (t: Transaction) =>
-      t.category?.toLowerCase() === "loans" ||
-      t.type === "liability" ||
-      (t.type === "asset" && /loan/i.test(t.description));
-
-    const financingInflows = filtered.filter(
-      (t) => isLoanRelated(t) && (t.type === "liability" || (t.type === "asset" && /loan/i.test(t.description)))
-    );
+    const isLoanRelated = isLoanRelatedGlobal;
     // Inflows: new loans received (liability) add cash; loans given out (asset) reduce cash
     // Outflows: loan repayments reduce cash
     const financingRows = filtered.filter(isLoanRelated).map(t => {
