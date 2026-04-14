@@ -6,7 +6,15 @@ import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Eye, EyeOff } from "lucide-react";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(false);
+  const hasVisited = localStorage.getItem("jenwealthy_visited");
+  const [isLogin, setIsLogin] = useState(!!hasVisited);
+
+  // Mark device as visited on first render
+  useState(() => {
+    if (!hasVisited) {
+      localStorage.setItem("jenwealthy_visited", "true");
+    }
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
