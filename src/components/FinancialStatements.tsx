@@ -208,23 +208,35 @@ const FinancialStatements = ({ transactions }: Props) => {
     const totalExpenses = expenses.reduce((s, t) => s + t.ugx_amount, 0);
     const netOperating = totalIncome - totalExpenses;
 
-    const financingLoanAsset = filtered.filter(
-      (t) => t.type === "asset" && /loan received/i.test(t.description)
+    // Financing: all loan-related transactions (by category or type)
+    const isLoanRelated = (t: Transaction) =>
+      t.category?.toLowerCase() === "loans" ||
+      t.type === "liability" ||
+      (t.type === "asset" && /loan/i.test(t.description));
+
+    const financingInflows = filtered.filter(
+      (t) => isLoanRelated(t) && (t.type === "liability" || (t.type === "asset" && /loan/i.test(t.description)))
     );
-    const financingLiabilityRepay = filtered.filter(
-      (t) => (t.type === "liability" && /loan repayment/i.test(t.description)) || 
-             (t.type === "transfer-out" && /repayment/i.test(t.description))
-    );
-    const financingRows = [
-      ...financingLoanAsset.map(t => ({...t, ugx_amount: Math.abs(t.ugx_amount || 0)})),
-      ...financingLiabilityRepay.map(t => ({...t, ugx_amount: -Math.abs(t.ugx_amount || 0)}))
-    ].sort((a, b) => {
+    // Inflows: new loans received (liability) add cash; loans given out (asset) reduce cash
+    // Outflows: loan repayments reduce cash
+    const financingRows = filtered.filter(isLoanRelated).map(t => {
+      const amt = Math.abs(t.ugx_amount || 0);
+      // Liability = borrowed money (cash in), negative liability = repayment (cash out)
+      // Asset with "loan" = money lent out (cash out), or repaid back (cash in)
+      if (t.type === "liability") {
+        return { ...t, ugx_amount: amt }; // borrowed = cash inflow
+      } else if (t.type === "transfer-out" || (t.type === "expense" && t.category?.toLowerCase() === "loans")) {
+        return { ...t, ugx_amount: -amt }; // repayment = cash outflow
+      } else if (t.type === "asset") {
+        return { ...t, ugx_amount: -amt }; // lent out = cash outflow
+      }
+      return { ...t, ugx_amount: amt };
+    }).sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return a.id.localeCompare(b.id);
     });
 
-    const netFinancing = financingLoanAsset.reduce((s, t) => s + Math.abs(t.ugx_amount || 0), 0) -
-                         financingLiabilityRepay.reduce((s, t) => s + Math.abs(t.ugx_amount || 0), 0);
+    const netFinancing = financingRows.reduce((s, t) => s + t.ugx_amount, 0);
     const netCashPosition = netOperating + netFinancing;
 
     return {
