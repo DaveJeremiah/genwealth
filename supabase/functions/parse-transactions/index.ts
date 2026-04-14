@@ -121,7 +121,7 @@ Rules:
       "utilities": "Utilities", "investments": "Investments", "crypto": "Crypto",
       "property": "Property", "salary": "Salary", "freelance": "Freelance",
       "business": "Business", "savings": "Savings", "transfer": "Transfer",
-      "entertainment": "Entertainment", "other": "Other",
+      "entertainment": "Entertainment", "loans": "Loans", "loan": "Loans", "other": "Other",
     };
 
     const normalized = parsed.transactions.map((t: any) => {
