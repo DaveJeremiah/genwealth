@@ -82,7 +82,9 @@ Deno.serve(async (req) => {
 Rules:
 - date MUST be YYYY-MM-DD format. Use today's date if not specified.
 - type MUST be one of: income, expense, asset, liability, transfer-in, transfer-out
-- category MUST be one of: Housing, Food & Dining, Transport, Entertainment, Health, Shopping, Utilities, Investments, Crypto, Property, Salary, Freelance, Business, Savings, Transfer, Other
+- Withdrawals (e.g. "withdrew 500k from bank", "ATM withdrawal") are transfers: use transfer-out from the source account. If moved to another account (e.g. cash, mobile money), also create a transfer-in to the destination account.
+- Loans RECEIVED are type "liability" (you owe money). Loans GIVEN OUT are type "asset" (someone owes you). Loan REPAYMENTS reduce the liability/asset accordingly.
+- category MUST be one of: Housing, Food & Dining, Transport, Entertainment, Health, Shopping, Utilities, Investments, Crypto, Property, Salary, Freelance, Business, Savings, Transfer, Loans, Other
 - currency: use exactly what user says (UGX, USD, EUR, GBP, KES, BTC, ETH, SOL). Default UGX.
 - ugx_amount: if currency is UGX, same as amount. Otherwise estimate UGX equivalent.
 - account: Cash, Bank, Mobile Money, or as specified.
