@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
             {
               role: "user",
               content: [
-                { type: "text", text: `Read and extract ALL visible text, numbers, dates, names, and amounts from this image. It could be anything — a receipt, screenshot, chat message, bank statement, invoice, handwritten note, label, or photo. Be thorough and literal. Return everything you see as a natural, detailed sentence. Do not filter or judge what is relevant.` },
+                { type: "text", text: `Extract the key financial details from this image. Focus on: amounts, item names, dates, vendor/source, and payment method. Skip decorative text, logos, and filler. Return a short bullet-style summary mapping each item to its price. Keep it concise — no essays.` },
                 {
                   type: "image_url",
                   image_url: { url: `data:image/jpeg;base64,${image}` }
@@ -86,7 +86,7 @@ Rules:
 - currency: use exactly what user says (UGX, USD, EUR, GBP, KES, BTC, ETH, SOL). Default UGX.
 - ugx_amount: if currency is UGX, same as amount. Otherwise estimate UGX equivalent.
 - account: Cash, Bank, Mobile Money, or as specified.
-- insight: one-sentence summary.` },
+- insight: a short, friendly financial tip or observation about this spending (e.g. "That's 3 food expenses today — consider meal prepping"). Max 15 words. No generic praise.` },
           { role: "user", content: input }
         ],
         tools: [{
