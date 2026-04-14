@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
             {
               role: "user",
               content: [
-                { type: "text", text: `Read and extract ALL visible text, numbers, dates, names, and amounts from this image. It could be anything — a receipt, screenshot, chat message, bank statement, invoice, handwritten note, label, or photo. Be thorough and literal. Return everything you see as a natural, detailed sentence. Do not filter or judge what is relevant.` },
+                { type: "text", text: `Extract the key financial details from this image. Focus on: amounts, item names, dates, vendor/source, and payment method. Skip decorative text, logos, and filler. Return a short bullet-style summary mapping each item to its price. Keep it concise — no essays.` },
                 {
                   type: "image_url",
                   image_url: { url: `data:image/jpeg;base64,${image}` }
