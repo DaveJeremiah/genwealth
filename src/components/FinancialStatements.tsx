@@ -227,28 +227,35 @@ const FinancialStatements = ({ transactions }: Props) => {
     return calculateOpeningBalance(transactions, monthStart);
   }, [transactions, monthStart]);
 
+  // Console validation per user's spec
   useEffect(() => {
-    if (!transactions || transactions.length === 0) return;
-    
-    console.log("--- Cash Flow Continuity Validation ---");
-    const chronologicalMonths = [...monthOptions].reverse();
-    
-    for (let i = 1; i < chronologicalMonths.length; i++) {
-        const prevMonth = chronologicalMonths[i-1];
-        const currMonth = chronologicalMonths[i];
-        
-        const prevOpen = calculateOpeningBalance(transactions, prevMonth.start);
-        const prevClose = calculateClosingBalance(transactions, prevMonth.start, prevMonth.end, prevOpen);
-        const currOpen = calculateOpeningBalance(transactions, currMonth.start);
-        
-        if (Math.abs(prevClose - currOpen) > 0.01) {
-            console.error(`Discrepancy found! Prev Month (${prevMonth.label}) Closing: ${prevClose} | Curr Month (${currMonth.label}) Opening: ${currOpen}. Diff: ${currOpen - prevClose}`);
-        } else {
-            console.log(`Verified continuity from ${prevMonth.label} to ${currMonth.label}`);
-        }
-    }
-    console.log("--- Validation Complete ---");
-  }, [transactions, monthOptions]);
+    if (!transactions || transactions.length === 0 || !monthStart || !monthEnd) return;
+
+    const moneyIn = cashFlow.totalIncome;
+    const moneyOut = cashFlow.totalExpenses;
+    const netLoans = cashFlow.netLoans;
+    const closingBalance = cfOpeningBalance + cashFlow.netCashPosition + netLoans;
+
+    // Previous month closing
+    const prevMonthStart = format(subMonths(new Date(monthStart), 1), "yyyy-MM-dd");
+    const prevOpen = calculateOpeningBalance(transactions, prevMonthStart);
+    const prevMonthEnd = format(endOfMonth(subMonths(new Date(monthStart), 1)), "yyyy-MM-dd");
+    const prevMonthTxns = transactions.filter(t => t.date >= prevMonthStart && t.date <= prevMonthEnd);
+    const prevMoneyIn = prevMonthTxns.filter(t => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
+    const prevMoneyOut = prevMonthTxns.filter(t => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
+    const prevLoansRcv = prevMonthTxns.filter(isLoanReceived).reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const prevLoansRep = prevMonthTxns.filter(isLoanRepayment).reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const prevClose = prevOpen + (prevMoneyIn - prevMoneyOut) + (prevLoansRcv - prevLoansRep);
+
+    console.log(`CF Validation:
+Opening Balance: ${cfOpeningBalance}
++ Money In: ${moneyIn}
+- Money Out: ${moneyOut}
++ Net Loans: ${netLoans}
+= Closing Balance: ${closingBalance}
+Previous month closing: ${prevClose}
+Match: ${Math.abs(prevClose - cfOpeningBalance) < 0.01}`);
+  }, [transactions, monthStart, monthEnd, cashFlow, cfOpeningBalance]);
 
   const nextMonthName = useMemo(() => {
     if (!monthStart) return "";
