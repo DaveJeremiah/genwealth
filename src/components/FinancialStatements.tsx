@@ -23,30 +23,19 @@ const getMonthOptions = () => {
   return months;
 };
 
-const isLoanRelatedGlobal = (t: Transaction) =>
-  t.category?.toLowerCase() === "loans" ||
-  t.type === "liability" ||
-  (t.type === "asset" && /loan/i.test(t.description));
+const isLoanReceived = (t: Transaction) =>
+  t.type === "asset" && /loan received/i.test(t.description);
+
+const isLoanRepayment = (t: Transaction) =>
+  t.type === "transfer-out" && /loan repayment/i.test(t.description);
 
 const getCashImpact = (t: Transaction): number => {
   const amt = Math.abs(Number(t.ugx_amount) || 0);
-  
-  // Financing (loan-related) — must check first to avoid double-counting
-  if (isLoanRelatedGlobal(t)) {
-    if (t.type === "liability") return amt; // borrowed = cash in
-    if (t.type === "transfer-out" || (t.type === "expense" && t.category?.toLowerCase() === "loans")) return -amt;
-    if (t.type === "asset") return -amt; // lent out = cash out
-    return amt;
-  }
-  
-  // Operating
   if (t.type === "income") return amt;
   if (t.type === "expense") return -amt;
-  
-  // Transfers (non-loan)
-  if (t.type === "transfer-in") return amt;
-  if (t.type === "transfer-out") return -amt;
-  
+  if (isLoanReceived(t)) return amt;
+  if (isLoanRepayment(t)) return -amt;
+  // All other types (asset, liability, transfer-in, transfer-out not matching above) are ignored
   return 0;
 };
 
@@ -54,12 +43,6 @@ const calculateOpeningBalance = (txns: Transaction[], upToDate: string) => {
   return txns
     .filter(t => t.date < upToDate)
     .reduce((bal, t) => bal + getCashImpact(t), 0);
-};
-
-const calculateClosingBalance = (_txns: Transaction[], monthStart: string, monthEnd: string, opening: number) => {
-  return _txns
-    .filter(t => t.date >= monthStart && t.date <= monthEnd)
-    .reduce((bal, t) => bal + getCashImpact(t), opening);
 };
 
 const FinancialStatements = ({ transactions }: Props) => {
