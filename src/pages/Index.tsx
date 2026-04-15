@@ -3,7 +3,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useOffline } from "@/contexts/OfflineContext";
-import { Home, Activity, LogOut } from "lucide-react";
+import { Home, Activity, FileText, LogOut } from "lucide-react";
+import FinancialStatements from "@/components/FinancialStatements";
 import OfflineBanner from "@/components/OfflineBanner";
 import SyncIndicator from "@/components/SyncIndicator";
 import HomeTab from "@/components/HomeTab";
@@ -22,7 +23,7 @@ const Index = () => {
   const { displayCurrency, setDisplayCurrency } = useCurrency();
   const { data: transactions = [] } = useTransactions();
   const { isOnline, syncStatus, pendingCount } = useOffline();
-  const [activeTab, setActiveTab] = useState<"home" | "pulse">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "statements" | "pulse">("home");
   const [latestInsight, setLatestInsight] = useState<string | null>(null);
 
   const firstName = user?.email?.split("@")[0] || "there";
@@ -128,6 +129,11 @@ const Index = () => {
             latestInsight={latestInsight}
             onInsight={setLatestInsight}
           />
+        ) : activeTab === "statements" ? (
+          <div className="space-y-6 pt-2 pb-[2px]">
+            <h1 className="text-2xl font-display font-bold text-foreground">Statements</h1>
+            <FinancialStatements transactions={transactions} />
+          </div>
         ) : (
           <PulseTab transactions={transactions} stats={stats} />
         )}
@@ -149,6 +155,17 @@ const Index = () => {
           >
             <Home className="w-4 h-4" />
             Home
+          </button>
+          <button
+            onClick={() => setActiveTab("statements")}
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-medium transition-all ${
+              activeTab === "statements"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Statements
           </button>
           <button
             onClick={() => setActiveTab("pulse")}
