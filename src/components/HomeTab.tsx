@@ -6,7 +6,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import TransactionInput from "@/components/TransactionInput";
 import StatsCards from "@/components/StatsCards";
-import FinancialStatements from "@/components/FinancialStatements";
+
 import TransactionLog from "@/components/TransactionLog";
 import WishListPanel from "@/components/WishListPanel";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -46,7 +46,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
   const { user } = useAuth();
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const [sectionTab, setSectionTab] = useState<"recent" | "statements" | "wishlist">("recent");
+  const [sectionTab, setSectionTab] = useState<"recent" | "wishlist">("recent");
 
   const greetingName = settings.nickname || displayName;
 
@@ -115,14 +115,6 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
             Entries
           </button>
           <button
-            onClick={() => setSectionTab("statements")}
-            className={`pb-2 text-sm font-medium transition-colors ${
-              sectionTab === "statements" ? "text-violet-hover border-b-2 border-primary" : "text-muted-foreground"
-            }`}
-          >
-            Statements
-          </button>
-          <button
             onClick={() => setSectionTab("wishlist")}
             className={`pb-2 text-sm font-medium transition-colors ${
               sectionTab === "wishlist" ? "text-violet-hover border-b-2 border-primary" : "text-muted-foreground"
@@ -144,8 +136,6 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
             </button>
           </div>
         </>
-      ) : sectionTab === "statements" ? (
-        <FinancialStatements transactions={transactions} />
       ) : (
         <WishListPanel />
       )}
