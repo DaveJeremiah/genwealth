@@ -23,30 +23,19 @@ const getMonthOptions = () => {
   return months;
 };
 
-const isLoanRelatedGlobal = (t: Transaction) =>
-  t.category?.toLowerCase() === "loans" ||
-  t.type === "liability" ||
-  (t.type === "asset" && /loan/i.test(t.description));
+const isLoanReceived = (t: Transaction) =>
+  t.type === "asset" && /loan received/i.test(t.description);
+
+const isLoanRepayment = (t: Transaction) =>
+  t.type === "transfer-out" && /loan repayment/i.test(t.description);
 
 const getCashImpact = (t: Transaction): number => {
   const amt = Math.abs(Number(t.ugx_amount) || 0);
-  
-  // Financing (loan-related) — must check first to avoid double-counting
-  if (isLoanRelatedGlobal(t)) {
-    if (t.type === "liability") return amt; // borrowed = cash in
-    if (t.type === "transfer-out" || (t.type === "expense" && t.category?.toLowerCase() === "loans")) return -amt;
-    if (t.type === "asset") return -amt; // lent out = cash out
-    return amt;
-  }
-  
-  // Operating
   if (t.type === "income") return amt;
   if (t.type === "expense") return -amt;
-  
-  // Transfers (non-loan)
-  if (t.type === "transfer-in") return amt;
-  if (t.type === "transfer-out") return -amt;
-  
+  if (isLoanReceived(t)) return amt;
+  if (isLoanRepayment(t)) return -amt;
+  // All other types (asset, liability, transfer-in, transfer-out not matching above) are ignored
   return 0;
 };
 
@@ -54,12 +43,6 @@ const calculateOpeningBalance = (txns: Transaction[], upToDate: string) => {
   return txns
     .filter(t => t.date < upToDate)
     .reduce((bal, t) => bal + getCashImpact(t), 0);
-};
-
-const calculateClosingBalance = (_txns: Transaction[], monthStart: string, monthEnd: string, opening: number) => {
-  return _txns
-    .filter(t => t.date >= monthStart && t.date <= monthEnd)
-    .reduce((bal, t) => bal + getCashImpact(t), opening);
 };
 
 const FinancialStatements = ({ transactions }: Props) => {
@@ -175,8 +158,21 @@ const FinancialStatements = ({ transactions }: Props) => {
   }, [transactions, monthStart, monthEnd]);
 
   const cashFlow = useMemo(() => {
-    const income = filtered.filter((t) => t.type === "income");
-    const expenses = filtered.filter((t) => t.type === "expense");
+    // Money In: strictly income only
+    const moneyIn = filtered.filter(t =>
+      t.type === "income" &&
+      !isLoanReceived(t) &&
+      !/loan received/i.test(t.description)
+    );
+    // Money Out: strictly expense only
+    const moneyOut = filtered.filter(t =>
+      t.type === "expense" &&
+      !isLoanRepayment(t) &&
+      !/loan repayment/i.test(t.description)
+    );
+    // Loans & Repayments
+    const loansReceived = filtered.filter(isLoanReceived);
+    const loanRepayments = filtered.filter(isLoanRepayment);
 
     const groupByCategory = (txns: Transaction[]) => {
       const map: Record<string, { total: number; items: Transaction[] }> = {};
@@ -188,45 +184,30 @@ const FinancialStatements = ({ transactions }: Props) => {
       return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
     };
 
-    const incomeGroups = groupByCategory(income);
-    const expenseGroups = groupByCategory(expenses);
-    const totalIncome = income.reduce((s, t) => s + t.ugx_amount, 0);
-    const totalExpenses = expenses.reduce((s, t) => s + t.ugx_amount, 0);
-    const netOperating = totalIncome - totalExpenses;
+    const incomeGroups = groupByCategory(moneyIn);
+    const expenseGroups = groupByCategory(moneyOut);
+    const totalIncome = moneyIn.reduce((s, t) => s + t.ugx_amount, 0);
+    const totalExpenses = moneyOut.reduce((s, t) => s + t.ugx_amount, 0);
+    const netCashPosition = totalIncome - totalExpenses;
 
-    // Financing: all loan-related transactions (by category or type)
-    const isLoanRelated = isLoanRelatedGlobal;
-    // Inflows: new loans received (liability) add cash; loans given out (asset) reduce cash
-    // Outflows: loan repayments reduce cash
-    const financingRows = filtered.filter(isLoanRelated).map(t => {
-      const amt = Math.abs(t.ugx_amount || 0);
-      // Liability = borrowed money (cash in), negative liability = repayment (cash out)
-      // Asset with "loan" = money lent out (cash out), or repaid back (cash in)
-      if (t.type === "liability") {
-        return { ...t, ugx_amount: amt }; // borrowed = cash inflow
-      } else if (t.type === "transfer-out" || (t.type === "expense" && t.category?.toLowerCase() === "loans")) {
-        return { ...t, ugx_amount: -amt }; // repayment = cash outflow
-      } else if (t.type === "asset") {
-        return { ...t, ugx_amount: -amt }; // lent out = cash outflow
-      }
-      return { ...t, ugx_amount: amt };
-    }).sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return a.id.localeCompare(b.id);
-    });
+    const totalLoansReceived = loansReceived.reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const totalLoanRepayments = loanRepayments.reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const netLoans = totalLoansReceived - totalLoanRepayments;
 
-    const netFinancing = financingRows.reduce((s, t) => s + t.ugx_amount, 0);
-    const netCashPosition = netOperating + netFinancing;
+    const financingRows = [...loansReceived.map(t => ({ ...t, ugx_amount: Math.abs(t.ugx_amount) })),
+      ...loanRepayments.map(t => ({ ...t, ugx_amount: -Math.abs(t.ugx_amount) }))
+    ].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
     return {
       incomeGroups,
       expenseGroups,
       totalIncome,
       totalExpenses,
-      netOperating,
-      financingRows,
-      netFinancing,
       netCashPosition,
+      financingRows,
+      totalLoansReceived,
+      totalLoanRepayments,
+      netLoans,
     };
   }, [filtered]);
 
@@ -246,28 +227,35 @@ const FinancialStatements = ({ transactions }: Props) => {
     return calculateOpeningBalance(transactions, monthStart);
   }, [transactions, monthStart]);
 
+  // Console validation per user's spec
   useEffect(() => {
-    if (!transactions || transactions.length === 0) return;
-    
-    console.log("--- Cash Flow Continuity Validation ---");
-    const chronologicalMonths = [...monthOptions].reverse();
-    
-    for (let i = 1; i < chronologicalMonths.length; i++) {
-        const prevMonth = chronologicalMonths[i-1];
-        const currMonth = chronologicalMonths[i];
-        
-        const prevOpen = calculateOpeningBalance(transactions, prevMonth.start);
-        const prevClose = calculateClosingBalance(transactions, prevMonth.start, prevMonth.end, prevOpen);
-        const currOpen = calculateOpeningBalance(transactions, currMonth.start);
-        
-        if (Math.abs(prevClose - currOpen) > 0.01) {
-            console.error(`Discrepancy found! Prev Month (${prevMonth.label}) Closing: ${prevClose} | Curr Month (${currMonth.label}) Opening: ${currOpen}. Diff: ${currOpen - prevClose}`);
-        } else {
-            console.log(`Verified continuity from ${prevMonth.label} to ${currMonth.label}`);
-        }
-    }
-    console.log("--- Validation Complete ---");
-  }, [transactions, monthOptions]);
+    if (!transactions || transactions.length === 0 || !monthStart || !monthEnd) return;
+
+    const moneyIn = cashFlow.totalIncome;
+    const moneyOut = cashFlow.totalExpenses;
+    const netLoans = cashFlow.netLoans;
+    const closingBalance = cfOpeningBalance + cashFlow.netCashPosition + netLoans;
+
+    // Previous month closing
+    const prevMonthStart = format(subMonths(new Date(monthStart), 1), "yyyy-MM-dd");
+    const prevOpen = calculateOpeningBalance(transactions, prevMonthStart);
+    const prevMonthEnd = format(endOfMonth(subMonths(new Date(monthStart), 1)), "yyyy-MM-dd");
+    const prevMonthTxns = transactions.filter(t => t.date >= prevMonthStart && t.date <= prevMonthEnd);
+    const prevMoneyIn = prevMonthTxns.filter(t => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
+    const prevMoneyOut = prevMonthTxns.filter(t => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
+    const prevLoansRcv = prevMonthTxns.filter(isLoanReceived).reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const prevLoansRep = prevMonthTxns.filter(isLoanRepayment).reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const prevClose = prevOpen + (prevMoneyIn - prevMoneyOut) + (prevLoansRcv - prevLoansRep);
+
+    console.log(`CF Validation:
+Opening Balance: ${cfOpeningBalance}
++ Money In: ${moneyIn}
+- Money Out: ${moneyOut}
++ Net Loans: ${netLoans}
+= Closing Balance: ${closingBalance}
+Previous month closing: ${prevClose}
+Match: ${Math.abs(prevClose - cfOpeningBalance) < 0.01}`);
+  }, [transactions, monthStart, monthEnd, cashFlow, cfOpeningBalance]);
 
   const nextMonthName = useMemo(() => {
     if (!monthStart) return "";
@@ -513,11 +501,11 @@ const FinancialStatements = ({ transactions }: Props) => {
           })}
           {cashFlow.financingRows.length > 0 && (
             <div className="flex justify-between items-center py-1.5 border-t border-border" style={{ borderTopWidth: "0.5px" }}>
-              <span className={`text-sm font-bold ${cashFlow.netFinancing >= 0 ? "text-success" : "text-destructive"}`}>
-                Net Financing
+              <span className={`text-sm font-bold ${cashFlow.netLoans >= 0 ? "text-success" : "text-destructive"}`}>
+                Net Loans
               </span>
-              <span className={`text-sm font-bold ${cashFlow.netFinancing >= 0 ? "text-success" : "text-destructive"}`}>
-                {formatUGX(cashFlow.netFinancing)}
+              <span className={`text-sm font-bold ${cashFlow.netLoans >= 0 ? "text-success" : "text-destructive"}`}>
+                {formatUGX(cashFlow.netLoans)}
               </span>
             </div>
           )}
@@ -526,47 +514,44 @@ const FinancialStatements = ({ transactions }: Props) => {
           <div className="space-y-3 rounded-xl border border-border bg-card/40 p-3" style={{ borderWidth: "0.5px" }}>
             <div className="flex justify-between items-start gap-2">
               <div>
-                <span className="text-base font-display font-bold text-foreground">Net Operating Cash</span>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Income minus expenses</p>
+                <span className="text-base font-display font-bold text-foreground">Net Cash Position</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">What you earned vs what you spent</p>
               </div>
               <span
-                className={`text-base font-display font-bold shrink-0 ${cashFlow.netOperating >= 0 ? "text-success" : "text-destructive"}`}
-              >
-                {formatUGX(cashFlow.netOperating)}
-              </span>
-            </div>
-            <div className="flex justify-between items-start gap-2">
-              <div>
-                <span className="text-base font-display font-bold text-foreground">Net Financing</span>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Loans received minus repayments</p>
-              </div>
-              <span
-                className={`text-base font-display font-bold shrink-0 ${cashFlow.netFinancing >= 0 ? "text-success" : "text-destructive"}`}
-              >
-                {formatUGX(cashFlow.netFinancing)}
-              </span>
-            </div>
-            <Divider />
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-display font-bold text-foreground">Net Cash Position</span>
-              <span
-                className={`text-lg font-display font-bold ${cashFlow.netCashPosition >= 0 ? "text-success" : "text-destructive"}`}
+                className={`text-base font-display font-bold shrink-0 ${cashFlow.netCashPosition >= 0 ? "text-success" : "text-destructive"}`}
               >
                 {formatUGX(cashFlow.netCashPosition)}
               </span>
             </div>
-          </div>
-
-          <div className="py-2">
-            <div className="flex justify-between items-center">
-              <span className="text-[20px] font-display font-bold text-[#9D5FF0]">Closing Balance</span>
-              <span className="text-[20px] font-display font-bold text-[#9D5FF0]">
-                {formatUGX(cfOpeningBalance + cashFlow.netCashPosition)}
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <span className="text-base font-display font-bold text-foreground">Net Loans</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Borrowing activity this period</p>
+              </div>
+              <span
+                className={`text-base font-display font-bold shrink-0 ${cashFlow.netLoans >= 0 ? "text-success" : "text-destructive"}`}
+              >
+                {formatUGX(cashFlow.netLoans)}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 text-right">
-              This carries into {nextMonthName}.
-            </p>
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <span className="text-base font-display font-bold text-foreground">Opening Balance</span>
+              </div>
+              <span className="text-base font-display font-bold shrink-0 text-[#F0EDE6]">
+                {formatUGX(cfOpeningBalance)}
+              </span>
+            </div>
+            <Divider />
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-[20px] font-display font-bold text-[#9D5FF0]">Closing Balance</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Carried into {nextMonthName}</p>
+              </div>
+              <span className="text-[20px] font-display font-bold text-[#9D5FF0]">
+                {formatUGX(cfOpeningBalance + cashFlow.netCashPosition + cashFlow.netLoans)}
+              </span>
+            </div>
           </div>
         </div>
       )}
