@@ -162,19 +162,19 @@ const FinancialStatements = ({ transactions }: Props) => {
   }, [transactions, monthStart, monthEnd]);
 
   const cashFlow = useMemo(() => {
-    // Money In: strictly income only
+    // Money In: strictly income only, exclude any loan-related
     const moneyIn = filtered.filter(t =>
       t.type === "income" &&
       !isLoanReceived(t) &&
-      !/loan received/i.test(t.description)
+      !isLoanRepayment(t)
     );
-    // Money Out: strictly expense only
+    // Money Out: strictly expense only, exclude any loan-related
     const moneyOut = filtered.filter(t =>
       t.type === "expense" &&
-      !isLoanRepayment(t) &&
-      !/loan repayment/i.test(t.description)
+      !isLoanReceived(t) &&
+      !isLoanRepayment(t)
     );
-    // Loans & Repayments
+    // Financing: all loan-related entries
     const loansReceived = filtered.filter(isLoanReceived);
     const loanRepayments = filtered.filter(isLoanRepayment);
 
