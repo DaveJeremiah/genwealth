@@ -24,10 +24,14 @@ const getMonthOptions = () => {
 };
 
 const isLoanReceived = (t: Transaction) =>
-  t.type === "asset" && /loan received/i.test(t.description);
+  (t.type === "liability" && t.ugx_amount > 0) ||
+  (t.type === "asset" && /loan received/i.test(t.description)) ||
+  (/loan received/i.test(t.description));
 
 const isLoanRepayment = (t: Transaction) =>
-  t.type === "transfer-out" && /loan repayment/i.test(t.description);
+  (t.type === "transfer-out" && /loan repayment/i.test(t.description)) ||
+  (t.type === "liability" && t.ugx_amount < 0) ||
+  (t.type === "expense" && /loan repayment/i.test(t.description));
 
 const getCashImpact = (t: Transaction): number => {
   const amt = Math.abs(Number(t.ugx_amount) || 0);
