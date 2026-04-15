@@ -158,8 +158,21 @@ const FinancialStatements = ({ transactions }: Props) => {
   }, [transactions, monthStart, monthEnd]);
 
   const cashFlow = useMemo(() => {
-    const income = filtered.filter((t) => t.type === "income");
-    const expenses = filtered.filter((t) => t.type === "expense");
+    // Money In: strictly income only
+    const moneyIn = filtered.filter(t =>
+      t.type === "income" &&
+      !isLoanReceived(t) &&
+      !/loan received/i.test(t.description)
+    );
+    // Money Out: strictly expense only
+    const moneyOut = filtered.filter(t =>
+      t.type === "expense" &&
+      !isLoanRepayment(t) &&
+      !/loan repayment/i.test(t.description)
+    );
+    // Loans & Repayments
+    const loansReceived = filtered.filter(isLoanReceived);
+    const loanRepayments = filtered.filter(isLoanRepayment);
 
     const groupByCategory = (txns: Transaction[]) => {
       const map: Record<string, { total: number; items: Transaction[] }> = {};
@@ -171,45 +184,30 @@ const FinancialStatements = ({ transactions }: Props) => {
       return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
     };
 
-    const incomeGroups = groupByCategory(income);
-    const expenseGroups = groupByCategory(expenses);
-    const totalIncome = income.reduce((s, t) => s + t.ugx_amount, 0);
-    const totalExpenses = expenses.reduce((s, t) => s + t.ugx_amount, 0);
-    const netOperating = totalIncome - totalExpenses;
+    const incomeGroups = groupByCategory(moneyIn);
+    const expenseGroups = groupByCategory(moneyOut);
+    const totalIncome = moneyIn.reduce((s, t) => s + t.ugx_amount, 0);
+    const totalExpenses = moneyOut.reduce((s, t) => s + t.ugx_amount, 0);
+    const netCashPosition = totalIncome - totalExpenses;
 
-    // Financing: all loan-related transactions (by category or type)
-    const isLoanRelated = isLoanRelatedGlobal;
-    // Inflows: new loans received (liability) add cash; loans given out (asset) reduce cash
-    // Outflows: loan repayments reduce cash
-    const financingRows = filtered.filter(isLoanRelated).map(t => {
-      const amt = Math.abs(t.ugx_amount || 0);
-      // Liability = borrowed money (cash in), negative liability = repayment (cash out)
-      // Asset with "loan" = money lent out (cash out), or repaid back (cash in)
-      if (t.type === "liability") {
-        return { ...t, ugx_amount: amt }; // borrowed = cash inflow
-      } else if (t.type === "transfer-out" || (t.type === "expense" && t.category?.toLowerCase() === "loans")) {
-        return { ...t, ugx_amount: -amt }; // repayment = cash outflow
-      } else if (t.type === "asset") {
-        return { ...t, ugx_amount: -amt }; // lent out = cash outflow
-      }
-      return { ...t, ugx_amount: amt };
-    }).sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return a.id.localeCompare(b.id);
-    });
+    const totalLoansReceived = loansReceived.reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const totalLoanRepayments = loanRepayments.reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const netLoans = totalLoansReceived - totalLoanRepayments;
 
-    const netFinancing = financingRows.reduce((s, t) => s + t.ugx_amount, 0);
-    const netCashPosition = netOperating + netFinancing;
+    const financingRows = [...loansReceived.map(t => ({ ...t, ugx_amount: Math.abs(t.ugx_amount) })),
+      ...loanRepayments.map(t => ({ ...t, ugx_amount: -Math.abs(t.ugx_amount) }))
+    ].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
     return {
       incomeGroups,
       expenseGroups,
       totalIncome,
       totalExpenses,
-      netOperating,
-      financingRows,
-      netFinancing,
       netCashPosition,
+      financingRows,
+      totalLoansReceived,
+      totalLoanRepayments,
+      netLoans,
     };
   }, [filtered]);
 
