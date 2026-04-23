@@ -184,15 +184,59 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
       if (error) throw error;
       if (data.error) throw new Error(data.error);
       const { transactions, insight } = data;
-      await addTransactions.mutateAsync(transactions);
-      onInsight(insight);
-      setInput("");
-      toast({ title: `${transactions.length} transaction(s) added`, description: insight });
+      if (!transactions || transactions.length === 0) {
+        toast({ title: "No transactions found", description: insight || "Try rephrasing." });
+        return;
+      }
+      setPendingTxs(transactions);
+      setPendingInsight(insight || "");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
+  };
+
+  const confirmPending = async () => {
+    if (!pendingTxs || pendingTxs.length === 0) return;
+    try {
+      await addTransactions.mutateAsync(pendingTxs as any);
+      if (pendingInsight) onInsight(pendingInsight);
+      toast({ title: `${pendingTxs.length} transaction(s) added`, description: pendingInsight });
+      setInput("");
+      setPendingTxs(null);
+      setPendingInsight("");
+      setEditMode(false);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const updatePending = (idx: number, field: keyof ParsedTx, value: any) => {
+    setPendingTxs((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
+  const removePending = (idx: number) => {
+    setPendingTxs((prev) => (prev ? prev.filter((_, i) => i !== idx) : prev));
+  };
+
+  const addPendingRow = () => {
+    setPendingTxs((prev) => [
+      ...(prev || []),
+      {
+        date: new Date().toISOString().split("T")[0],
+        description: "",
+        amount: 0,
+        currency: "UGX",
+        type: "expense",
+        category: "Other",
+      },
+    ]);
   };
 
   const resizeTextarea = useCallback(() => {
