@@ -1,13 +1,25 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Loader2, Mic, MicOff, FileText, Camera } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Send, Loader2, Mic, MicOff, FileText, Camera, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useOffline } from "@/contexts/OfflineContext";
 import { offlineDb, type LocalTransaction, type LocalMemo } from "@/lib/offlineDb";
+
+interface ParsedTx {
+  date: string;
+  description: string;
+  amount: number;
+  currency: string;
+  ugx_amount?: number;
+  type: string;
+  category: string;
+  account?: string;
+}
 
 interface TransactionInputProps {
   onInsight: (insight: string) => void;
