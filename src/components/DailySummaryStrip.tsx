@@ -13,6 +13,7 @@ const MAX_HISTORY_DAYS = 90;
 const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
   const { formatUGX } = useCurrency();
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [expanded, setExpanded] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
