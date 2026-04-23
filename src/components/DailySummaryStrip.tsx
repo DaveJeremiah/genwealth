@@ -255,8 +255,142 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
       >
         {verdict}
       </p>
+
+      {/* Collapsible toggle */}
+      {(earnedEntries.length > 0 || spentEntries.length > 0) && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Hide details" : "Show details"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4,
+            margin: "10px auto 0",
+            background: "none",
+            border: "none",
+            color: "#888",
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: "pointer",
+            padding: "4px 8px",
+          }}
+        >
+          {expanded ? "Hide details" : "Show details"}
+          <ChevronDown
+            className="w-3.5 h-3.5"
+            style={{
+              transition: "transform 200ms ease",
+              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          />
+        </button>
+      )}
+
+      {/* Collapsible content — entries card */}
+      {expanded && (earnedEntries.length > 0 || spentEntries.length > 0) && (
+        <div
+          style={{
+            marginTop: 10,
+            background: "#0F0F0F",
+            border: "0.5px solid #1E1E1E",
+            borderRadius: 12,
+            padding: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          {earnedEntries.length > 0 && (
+            <EntryGroup
+              title="Earned"
+              accent="#4CC98F"
+              entries={earnedEntries}
+              formatUGX={formatUGX}
+            />
+          )}
+          {spentEntries.length > 0 && (
+            <EntryGroup
+              title="Spent"
+              accent="#C94C4C"
+              entries={spentEntries}
+              formatUGX={formatUGX}
+              negative
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };
+
+const EntryGroup = ({
+  title,
+  accent,
+  entries,
+  formatUGX,
+  negative,
+}: {
+  title: string;
+  accent: string;
+  entries: Transaction[];
+  formatUGX: (n: number) => string;
+  negative?: boolean;
+}) => (
+  <div>
+    <p
+      style={{
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.08em",
+        color: accent,
+        marginBottom: 6,
+        textTransform: "uppercase",
+      }}
+    >
+      {title}
+    </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {entries.map((t) => (
+        <div
+          key={t.id}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p
+              style={{
+                fontSize: 12,
+                color: "#D0D0D0",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {t.description}
+            </p>
+            <p style={{ fontSize: 10, color: "#666" }}>{t.category}</p>
+          </div>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: accent,
+              flexShrink: 0,
+            }}
+          >
+            {negative ? "−" : "+"}
+            {formatUGX(Math.abs(t.ugx_amount))}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default DailySummaryStrip;
