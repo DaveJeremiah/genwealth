@@ -45,6 +45,11 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
   const { addTransactions } = useTransactions();
   const { toast } = useToast();
 
+  // Confirmation dialog state
+  const [pendingTxs, setPendingTxs] = useState<ParsedTx[] | null>(null);
+  const [pendingInsight, setPendingInsight] = useState<string>("");
+  const [editMode, setEditMode] = useState(false);
+
   // Offline quick form state
   const [offDesc, setOffDesc] = useState("");
   const [offAmount, setOffAmount] = useState("");
