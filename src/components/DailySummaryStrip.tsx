@@ -189,6 +189,7 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           gridTemplateColumns: "1fr 1fr 1fr",
           gap: 8,
           textAlign: "center",
+          alignItems: "start",
         }}
       >
         {/* Earned */}
@@ -206,6 +207,13 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           >
             {formatUGX(earned)}
           </p>
+          {expanded && earnedEntries.length > 0 && (
+            <ColumnEntries
+              entries={earnedEntries}
+              accent="#4CC98F"
+              formatUGX={formatUGX}
+            />
+          )}
         </div>
 
         {/* Spent */}
@@ -223,6 +231,14 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           >
             {formatUGX(spent)}
           </p>
+          {expanded && spentEntries.length > 0 && (
+            <ColumnEntries
+              entries={spentEntries}
+              accent="#C94C4C"
+              formatUGX={formatUGX}
+              negative
+            />
+          )}
         </div>
 
         {/* Net */}
@@ -286,40 +302,6 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
             }}
           />
         </button>
-      )}
-
-      {/* Collapsible content — entries card */}
-      {expanded && (earnedEntries.length > 0 || spentEntries.length > 0) && (
-        <div
-          style={{
-            marginTop: 10,
-            background: "#0F0F0F",
-            border: "0.5px solid #1E1E1E",
-            borderRadius: 12,
-            padding: 12,
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          {earnedEntries.length > 0 && (
-            <EntryGroup
-              title="Earned"
-              accent="#4CC98F"
-              entries={earnedEntries}
-              formatUGX={formatUGX}
-            />
-          )}
-          {spentEntries.length > 0 && (
-            <EntryGroup
-              title="Spent"
-              accent="#C94C4C"
-              entries={spentEntries}
-              formatUGX={formatUGX}
-              negative
-            />
-          )}
-        </div>
       )}
     </div>
   );
