@@ -70,15 +70,22 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
 
   const dateKey = format(selectedDate, "yyyy-MM-dd");
 
-  const { earned, spent } = useMemo(() => {
+  const { earned, spent, earnedEntries, spentEntries } = useMemo(() => {
     let earned = 0;
     let spent = 0;
+    const earnedEntries: Transaction[] = [];
+    const spentEntries: Transaction[] = [];
     for (const t of transactions) {
       if (t.date !== dateKey) continue;
-      if (t.type === "income") earned += Math.abs(t.ugx_amount);
-      else if (t.type === "expense") spent += Math.abs(t.ugx_amount);
+      if (t.type === "income") {
+        earned += Math.abs(t.ugx_amount);
+        earnedEntries.push(t);
+      } else if (t.type === "expense") {
+        spent += Math.abs(t.ugx_amount);
+        spentEntries.push(t);
+      }
     }
-    return { earned, spent };
+    return { earned, spent, earnedEntries, spentEntries };
   }, [transactions, dateKey]);
 
   const net = earned - spent;
