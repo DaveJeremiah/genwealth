@@ -23,14 +23,15 @@ const getMonthOptions = () => {
   return months;
 };
 
+// Cash-side of a loan received: the asset (cash) entry only.
+// The paired liability entry is excluded from cash flow (it belongs on the Balance Sheet).
 const isLoanReceived = (t: Transaction) =>
-  (t.type === "liability" && t.ugx_amount > 0) ||
-  (t.type === "asset" && /loan received/i.test(t.description)) ||
-  (/loan received/i.test(t.description));
+  t.type === "asset" && /loan received/i.test(t.description);
 
+// Cash-side of a loan repayment: the transfer-out (cash leaving) only.
+// The paired negative-liability entry is excluded from cash flow.
 const isLoanRepayment = (t: Transaction) =>
   (t.type === "transfer-out" && /loan repayment/i.test(t.description)) ||
-  (t.type === "liability" && t.ugx_amount < 0) ||
   (t.type === "expense" && /loan repayment/i.test(t.description));
 
 const getCashImpact = (t: Transaction): number => {
