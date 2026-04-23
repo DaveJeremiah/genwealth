@@ -186,7 +186,9 @@ If no transactions are found, return an empty array and a helpful insight messag
         type,
         category: cat,
         account,
-        ugx_amount: t.ugx_amount || (t.currency === "UGX" ? t.amount : t.amount),
+        ugx_amount: (t.ugx_amount !== undefined && t.ugx_amount !== null && t.ugx_amount !== 0)
+          ? Number(t.ugx_amount)
+          : (t.currency === "UGX" ? t.amount : t.amount),
       };
     });
 
