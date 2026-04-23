@@ -33,8 +33,13 @@ const Index = () => {
     const income = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.ugx_amount, 0);
     const expenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.ugx_amount, 0);
     const assets = transactions.filter((t) => t.type === "asset").reduce((s, t) => s + t.ugx_amount, 0);
-    const liabilities = transactions.filter((t) => t.type === "liability").reduce((s, t) => s + t.ugx_amount, 0);
-    const netWorth = assets - liabilities + income - expenses;
+    const liabilities = transactions
+      .filter((t) => t.type === "liability")
+      .reduce((s, t) => s + Math.abs(t.ugx_amount), 0);
+    const netLiabilities = transactions
+      .filter((t) => t.type === "liability")
+      .reduce((s, t) => s + t.ugx_amount, 0);
+    const netWorth = assets - netLiabilities + income - expenses;
     const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
     return { income, expenses, netWorth, savingsRate, assets, liabilities };
   }, [transactions]);
