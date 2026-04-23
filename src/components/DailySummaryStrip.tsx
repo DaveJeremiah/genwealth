@@ -189,6 +189,7 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           gridTemplateColumns: "1fr 1fr 1fr",
           gap: 8,
           textAlign: "center",
+          alignItems: "start",
         }}
       >
         {/* Earned */}
@@ -206,6 +207,13 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           >
             {formatUGX(earned)}
           </p>
+          {expanded && earnedEntries.length > 0 && (
+            <ColumnEntries
+              entries={earnedEntries}
+              accent="#4CC98F"
+              formatUGX={formatUGX}
+            />
+          )}
         </div>
 
         {/* Spent */}
@@ -223,6 +231,14 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           >
             {formatUGX(spent)}
           </p>
+          {expanded && spentEntries.length > 0 && (
+            <ColumnEntries
+              entries={spentEntries}
+              accent="#C94C4C"
+              formatUGX={formatUGX}
+              negative
+            />
+          )}
         </div>
 
         {/* Net */}
@@ -287,109 +303,74 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
           />
         </button>
       )}
-
-      {/* Collapsible content — entries card */}
-      {expanded && (earnedEntries.length > 0 || spentEntries.length > 0) && (
-        <div
-          style={{
-            marginTop: 10,
-            background: "#0F0F0F",
-            border: "0.5px solid #1E1E1E",
-            borderRadius: 12,
-            padding: 12,
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          {earnedEntries.length > 0 && (
-            <EntryGroup
-              title="Earned"
-              accent="#4CC98F"
-              entries={earnedEntries}
-              formatUGX={formatUGX}
-            />
-          )}
-          {spentEntries.length > 0 && (
-            <EntryGroup
-              title="Spent"
-              accent="#C94C4C"
-              entries={spentEntries}
-              formatUGX={formatUGX}
-              negative
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 };
 
-const EntryGroup = ({
-  title,
-  accent,
+const ColumnEntries = ({
   entries,
+  accent,
   formatUGX,
   negative,
 }: {
-  title: string;
-  accent: string;
   entries: Transaction[];
+  accent: string;
   formatUGX: (n: number) => string;
   negative?: boolean;
 }) => (
-  <div>
-    <p
-      style={{
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        color: accent,
-        marginBottom: 6,
-        textTransform: "uppercase",
-      }}
-    >
-      {title}
-    </p>
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {entries.map((t) => (
+  <div
+    style={{
+      marginTop: 10,
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      textAlign: "left",
+    }}
+  >
+    {entries.map((t) => (
+      <div
+        key={t.id}
+        style={{
+          background: "#0F0F0F",
+          border: "0.5px solid #1E1E1E",
+          borderRadius: 8,
+          padding: "6px 8px",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 11,
+            color: "#D0D0D0",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {t.description}
+        </p>
         <div
-          key={t.id}
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            gap: 8,
+            gap: 4,
+            marginTop: 2,
           }}
         >
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <p
-              style={{
-                fontSize: 12,
-                color: "#D0D0D0",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {t.description}
-            </p>
-            <p style={{ fontSize: 10, color: "#666" }}>{t.category}</p>
-          </div>
+          <span style={{ fontSize: 9, color: "#666" }}>{t.category}</span>
           <span
             style={{
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: 600,
               color: accent,
-              flexShrink: 0,
             }}
           >
             {negative ? "−" : "+"}
             {formatUGX(Math.abs(t.ugx_amount))}
           </span>
         </div>
-      ))}
-    </div>
+      </div>
+    ))}
   </div>
 );
 
