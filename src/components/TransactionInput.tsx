@@ -150,12 +150,8 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
       if (data.error) throw new Error(data.error);
       
       if (data.transactions && data.transactions.length > 0) {
-        await addTransactions.mutateAsync(data.transactions);
-        if (data.insight) onInsight(data.insight);
-        toast({ 
-          title: "Scan complete", 
-          description: `${data.transactions.length} transaction(s) added. ${data.insight || ""}` 
-        });
+        setPendingTxs(data.transactions);
+        setPendingInsight(data.insight || "");
       } else {
         // Fallback: if no transactions but we got text/insight, put it in the box
         if (data.insight) setInput(data.insight);
