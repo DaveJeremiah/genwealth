@@ -10,10 +10,42 @@ const SYSTEM_PROMPT = `You are a personal financial advisor and accounting tutor
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Handle authentication - allow anonymous access for now
+  const authHeader = req.headers.get("Authorization");
+  console.log("Auth header:", authHeader?.substring(0, 20) + "...");
+
   try {
-    const { messages, financialContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const body = await req.json().catch(() => ({}));
+    console.log("Request body received:", JSON.stringify(body, null, 2));
+    const { messages, financialContext } = body;
+
+    if (!messages || !Array.isArray(messages)) {
+      console.log("Invalid messages format:", messages);
+      return new Response(JSON.stringify({ error: "Invalid messages format" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    console.log("GEMINI_API_KEY exists:", !!GEMINI_API_KEY);
+    console.log("GEMINI_API_KEY value:", GEMINI_API_KEY?.substring(0, 10) + "...");
+    
+    if (!GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY is not configured");
+      return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not configured" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Test mode - return mock response if using placeholder key
+    if (GEMINI_API_KEY === "your_gemini_api_key_here") {
+      console.log("Using test mode - returning mock response");
+      return new Response(JSON.stringify({ 
+        content: "Hello! I'm your Jenwealthy AI assistant. I can see you're asking about your finances. Currently, I'm running in test mode. Please set up your actual Gemini API key in the Supabase dashboard to get real AI responses." 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Build context block from user's financial data
     let contextBlock = "";
@@ -32,14 +64,14 @@ ${fc.transactions?.map((t: any) => `- ${t.date} | ${t.description} | ${t.amount}
 --- END FINANCIAL DATA ---`;
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Authorization": `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-1.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT + contextBlock },
           ...messages,
@@ -48,17 +80,20 @@ ${fc.transactions?.map((t: any) => `- ${t.date} | ${t.description} | ${t.amount}
     });
 
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Gemini API Error (${response.status}):`, errText);
+
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited. Try again in a moment." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
+        return new Response(JSON.stringify({ error: "API credits exhausted." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`Gemini API error (${response.status}): ${errText.substring(0, 200)}`);
     }
 
     const data = await response.json();
@@ -67,6 +102,7 @@ ${fc.transactions?.map((t: any) => `- ${t.date} | ${t.description} | ${t.amount}
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     console.error("ai-chat error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {

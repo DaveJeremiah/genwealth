@@ -9,6 +9,7 @@ import StatsCards from "@/components/StatsCards";
 
 import TransactionLog from "@/components/TransactionLog";
 import WishListPanel from "@/components/WishListPanel";
+import DailySummaryStrip from "@/components/DailySummaryStrip";
 import { useSettings } from "@/contexts/SettingsContext";
 
 const CASUAL_GREETINGS: ((name: string) => string)[] = [
@@ -139,6 +140,9 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       ) : (
         <WishListPanel />
       )}
+
+      {/* Daily Summary Strip */}
+      <DailySummaryStrip transactions={transactions} />
     </div>
   );
 };

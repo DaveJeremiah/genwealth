@@ -1,0 +1,253 @@
+import { useState, useMemo, useRef, useCallback } from "react";
+import { format, subDays, isToday, isBefore, startOfDay } from "date-fns";
+import { Transaction } from "@/hooks/useTransactions";
+import { useCurrency } from "@/contexts/CurrencyContext";
+
+interface DailySummaryStripProps {
+  transactions: Transaction[];
+}
+
+const MAX_HISTORY_DAYS = 90;
+
+const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
+  const { formatUGX } = useCurrency();
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const touchStartX = useRef<number | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const minDate = useMemo(() => startOfDay(subDays(new Date(), MAX_HISTORY_DAYS)), []);
+  const todayDate = useMemo(() => startOfDay(new Date()), []);
+
+  const canGoBack = useMemo(
+    () => !isBefore(selectedDate, subDays(minDate, -1)) && selectedDate > minDate,
+    [selectedDate, minDate]
+  );
+  const canGoForward = useMemo(
+    () => selectedDate < todayDate,
+    [selectedDate, todayDate]
+  );
+
+  const goBack = useCallback(() => {
+    if (canGoBack) {
+      setSelectedDate((d) => subDays(d, 1));
+    }
+  }, [canGoBack]);
+
+  const goForward = useCallback(() => {
+    if (canGoForward) {
+      setSelectedDate((d) => {
+        const next = new Date(d);
+        next.setDate(next.getDate() + 1);
+        return next > todayDate ? todayDate : next;
+      });
+    }
+  }, [canGoForward, todayDate]);
+
+  // Touch handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (touchStartX.current === null) return;
+      const diff = e.changedTouches[0].clientX - touchStartX.current;
+      touchStartX.current = null;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          // Swiped right → previous day
+          goBack();
+        } else {
+          // Swiped left → next day
+          goForward();
+        }
+      }
+    },
+    [goBack, goForward]
+  );
+
+  const dateKey = format(selectedDate, "yyyy-MM-dd");
+
+  const { earned, spent } = useMemo(() => {
+    let earned = 0;
+    let spent = 0;
+    for (const t of transactions) {
+      if (t.date !== dateKey) continue;
+      if (t.type === "income") earned += Math.abs(t.ugx_amount);
+      else if (t.type === "expense") spent += Math.abs(t.ugx_amount);
+    }
+    return { earned, spent };
+  }, [transactions, dateKey]);
+
+  const net = earned - spent;
+
+  const verdict = useMemo(() => {
+    if (earned === 0 && spent === 0) return "Nothing recorded yet today";
+    if (net > 0) return "Good day — you earned more than you spent";
+    if (net < 0) return "Tough day — spending exceeded income";
+    return "Broke even today";
+  }, [earned, spent, net]);
+
+  const dateLabel = format(selectedDate, "EEEE, MMMM d").toUpperCase();
+
+  const formatNet = (value: number) => {
+    const prefix = value > 0 ? "+" : value < 0 ? "−" : "";
+    return prefix + formatUGX(Math.abs(value));
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{
+        background: "#161616",
+        borderRadius: 16,
+        border: "0.5px solid #1E1E1E",
+        padding: 16,
+        position: "relative",
+        userSelect: "none",
+        touchAction: "pan-y",
+        overflow: "hidden",
+      }}
+    >
+      {/* Left chevron */}
+      {canGoBack && (
+        <button
+          onClick={goBack}
+          aria-label="Previous day"
+          style={{
+            position: "absolute",
+            left: 4,
+            top: "50%",
+            transform: "translateY(-50%)",
+            background: "none",
+            border: "none",
+            color: "#555",
+            fontSize: 18,
+            cursor: "pointer",
+            padding: "8px 4px",
+            lineHeight: 1,
+            zIndex: 2,
+          }}
+        >
+          ‹
+        </button>
+      )}
+
+      {/* Right chevron */}
+      {canGoForward && (
+        <button
+          onClick={goForward}
+          aria-label="Next day"
+          style={{
+            position: "absolute",
+            right: 4,
+            top: "50%",
+            transform: "translateY(-50%)",
+            background: "none",
+            border: "none",
+            color: "#555",
+            fontSize: 18,
+            cursor: "pointer",
+            padding: "8px 4px",
+            lineHeight: 1,
+            zIndex: 2,
+          }}
+        >
+          ›
+        </button>
+      )}
+
+      {/* Date */}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          color: "#666",
+          marginBottom: 12,
+          textAlign: "center",
+        }}
+      >
+        {dateLabel}
+      </p>
+
+      {/* Three columns */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 8,
+          textAlign: "center",
+        }}
+      >
+        {/* Earned */}
+        <div>
+          <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Earned</p>
+          <p
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#4CC98F",
+              lineHeight: 1.2,
+              wordBreak: "break-all",
+            }}
+          >
+            {formatUGX(earned)}
+          </p>
+        </div>
+
+        {/* Spent */}
+        <div>
+          <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Spent</p>
+          <p
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#C94C4C",
+              lineHeight: 1.2,
+              wordBreak: "break-all",
+            }}
+          >
+            {formatUGX(spent)}
+          </p>
+        </div>
+
+        {/* Net */}
+        <div>
+          <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Net</p>
+          <p
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: 18,
+              fontWeight: 700,
+              color: net >= 0 ? "#4CC98F" : "#C94C4C",
+              lineHeight: 1.2,
+              wordBreak: "break-all",
+            }}
+          >
+            {formatNet(net)}
+          </p>
+        </div>
+      </div>
+
+      {/* Verdict */}
+      <p
+        style={{
+          fontSize: 12,
+          fontStyle: "italic",
+          color: "#555",
+          textAlign: "center",
+          marginTop: 12,
+        }}
+      >
+        {verdict}
+      </p>
+    </div>
+  );
+};
+
+export default DailySummaryStrip;

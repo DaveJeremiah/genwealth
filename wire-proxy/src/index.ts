@@ -8,6 +8,8 @@ export interface Env {
   ELEVENLABS_API_KEY?: string;
   AZURE_SPEECH_KEY?: string;
   AZURE_SPEECH_REGION?: string;
+  AZURE_VISION_KEY?: string;
+  AZURE_VISION_ENDPOINT?: string;
 }
 
 export default {
@@ -27,6 +29,9 @@ export default {
       }
       if (url.pathname === "/azure-tts") {
         return withCors(await handleAzureTts(request, env));
+      }
+      if (url.pathname === "/ocr") {
+        return withCors(await handleAzureOcr(request, env));
       }
 
       const body = (await safeJson(request)) as {
@@ -124,6 +129,73 @@ async function handleAzureTts(request: Request, env: Env): Promise<Response> {
   const audio_base64 = btoa(binary);
 
   return json({ audio_base64 });
+}
+
+async function handleAzureOcr(request: Request, env: Env): Promise<Response> {
+  const key = env.AZURE_VISION_KEY;
+  const endpoint = env.AZURE_VISION_ENDPOINT; // e.g. https://your-resource.cognitiveservices.azure.com/
+
+  if (!key) return json({ error: "AZURE_VISION_KEY is not configured on the Worker." }, 500);
+  if (!endpoint) return json({ error: "AZURE_VISION_ENDPOINT is not configured on the Worker." }, 500);
+
+  const body = (await safeJson(request)) as { image?: string };
+  const imageBase64 = body.image;
+  if (!imageBase64) return json({ error: "Missing image data" }, 400);
+
+  try {
+    const rawImage = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+    
+    // 1. Submit to Azure Read API
+    // Ensure endpoint doesn't have trailing slash
+    const cleanEndpoint = endpoint.replace(/\/$/, "");
+    const analyzeUrl = `${cleanEndpoint}/vision/v3.2/read/analyze`;
+
+    const analyzeResponse = await fetch(analyzeUrl, {
+      method: "POST",
+      headers: {
+        "Ocp-Apim-Subscription-Key": key,
+        "Content-Type": "application/octet-stream",
+      },
+      body: rawImage,
+    });
+
+    if (!analyzeResponse.ok) {
+      const err = await analyzeResponse.text();
+      return json({ error: `Azure OCR Submit failed: ${err}` }, analyzeResponse.status);
+    }
+
+    const operationUrl = analyzeResponse.headers.get("Operation-Location");
+    if (!operationUrl) return json({ error: "Azure did not return operation location" }, 500);
+
+    // 2. Poll for results (Max 10 seconds)
+    let status = "running";
+    let attempts = 0;
+    let resultData: any = null;
+
+    while ((status === "running" || status === "notStarted") && attempts < 20) {
+      await new Promise(r => setTimeout(r, 500)); // Poll every 500ms
+      const pollResponse = await fetch(operationUrl, {
+        headers: { "Ocp-Apim-Subscription-Key": key },
+      });
+      resultData = await pollResponse.json();
+      status = resultData.status;
+      attempts++;
+    }
+
+    if (status !== "succeeded") {
+      return json({ error: `Azure OCR failed with status: ${status}` }, 500);
+    }
+
+    // 3. Extract text from results
+    const lines = resultData.analyzeResult.readResults.flatMap((page: any) => 
+      page.lines.map((line: any) => line.text)
+    );
+    const joinedText = lines.join(" ");
+
+    return json({ text: joinedText });
+  } catch (error: any) {
+    return json({ error: `OCR error: ${error.message}` }, 500);
+  }
 }
 
 async function handleElevenLabsTts(request: Request, env: Env): Promise<Response> {

@@ -124,29 +124,34 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
         reader.readAsDataURL(file);
       });
 
-      // 2. Call Edge Function with compressed image
+      // 2. Call Supabase vision parser with compressed image
       const { data, error } = await supabase.functions.invoke("parse-transactions", {
         body: { image: compressedBase64 },
       });
 
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
       
-      // The function returns { text: "..." } for a scan-only request
-      if (data && data.text) {
-        // "Type" it into the box
-        setInput(data.text);
-        toast({ title: "Scan complete", description: "Details extracted. Please review and send." });
-      } else if (data && data.error) {
-        throw new Error(data.error);
+      if (data.transactions && data.transactions.length > 0) {
+        await addTransactions.mutateAsync(data.transactions);
+        if (data.insight) onInsight(data.insight);
+        toast({ 
+          title: "Scan complete", 
+          description: `${data.transactions.length} transaction(s) added. ${data.insight || ""}` 
+        });
       } else {
-        throw new Error("The scanner couldn't find any details in this image. Try a clearer photo.");
+        // Fallback: if no transactions but we got text/insight, put it in the box
+        if (data.insight) setInput(data.insight);
+        toast({ 
+          title: "Scan results", 
+          description: data.insight || "No transactions found in this image.",
+        });
       }
     } catch (error: any) {
       console.error("Scan error details:", error);
-      // Show the actual error message so we can debug
       toast({ 
         title: "Scan error", 
-        description: error.message || "Something went wrong with the cloud scanner.", 
+        description: error.message || "Something went wrong with the AI scanner.", 
         variant: "destructive" 
       });
     } finally {
@@ -260,7 +265,6 @@ const TransactionInput = ({ onInsight }: TransactionInputProps) => {
             ref={fileInputRef}
             onChange={handleImageScan}
             accept="image/*"
-            capture="environment"
             className="hidden"
           />
           {scanning ? (
