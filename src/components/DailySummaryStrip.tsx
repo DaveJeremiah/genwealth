@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { format, subDays, isToday, isBefore, startOfDay } from "date-fns";
+import { ChevronDown } from "lucide-react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
