@@ -47,7 +47,7 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
   const { user } = useAuth();
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const [sectionTab, setSectionTab] = useState<"recent" | "wishlist">("recent");
+  const [sectionTab, setSectionTab] = useState<"daily" | "recent" | "wishlist">("daily");
 
   const greetingName = settings.nickname || displayName;
 
@@ -108,6 +108,14 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       <div>
         <div className="flex gap-6 relative flex-wrap">
           <button
+            onClick={() => setSectionTab("daily")}
+            className={`pb-2 text-sm font-medium transition-colors ${
+              sectionTab === "daily" ? "text-violet-hover border-b-2 border-primary" : "text-muted-foreground"
+            }`}
+          >
+            Daily
+          </button>
+          <button
             onClick={() => setSectionTab("recent")}
             className={`pb-2 text-sm font-medium transition-colors ${
               sectionTab === "recent" ? "text-violet-hover border-b-2 border-primary" : "text-muted-foreground"
@@ -128,7 +136,9 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       </div>
 
       {/* Section Content */}
-      {sectionTab === "recent" ? (
+      {sectionTab === "daily" ? (
+        <DailySummaryStrip transactions={transactions} />
+      ) : sectionTab === "recent" ? (
         <>
           <RecentEntries transactions={transactions} />
           <div className="pt-2 text-center py-0">
@@ -140,9 +150,6 @@ const HomeTab = ({ transactions, stats, displayName, latestInsight, onInsight }:
       ) : (
         <WishListPanel />
       )}
-
-      {/* Daily Summary Strip */}
-      <DailySummaryStrip transactions={transactions} />
     </div>
   );
 };
