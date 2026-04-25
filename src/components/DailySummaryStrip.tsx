@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from "react";
-import { format, subDays, isToday, isBefore, startOfDay } from "date-fns";
+import { format, subDays, isBefore, startOfDay } from "date-fns";
 import { ChevronDown } from "lucide-react";
 import { Transaction } from "@/hooks/useTransactions";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -13,9 +13,8 @@ const MAX_HISTORY_DAYS = 90;
 const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
   const { formatUGX } = useCurrency();
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const touchStartX = useRef<number | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
 
   const minDate = useMemo(() => startOfDay(subDays(new Date(), MAX_HISTORY_DAYS)), []);
   const todayDate = useMemo(() => startOfDay(new Date()), []);
@@ -24,15 +23,10 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
     () => !isBefore(selectedDate, subDays(minDate, -1)) && selectedDate > minDate,
     [selectedDate, minDate]
   );
-  const canGoForward = useMemo(
-    () => selectedDate < todayDate,
-    [selectedDate, todayDate]
-  );
+  const canGoForward = useMemo(() => selectedDate < todayDate, [selectedDate, todayDate]);
 
   const goBack = useCallback(() => {
-    if (canGoBack) {
-      setSelectedDate((d) => subDays(d, 1));
-    }
+    if (canGoBack) setSelectedDate((d) => subDays(d, 1));
   }, [canGoBack]);
 
   const goForward = useCallback(() => {
@@ -45,25 +39,15 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
     }
   }, [canGoForward, todayDate]);
 
-  // Touch handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
   }, []);
-
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       if (touchStartX.current === null) return;
       const diff = e.changedTouches[0].clientX - touchStartX.current;
       touchStartX.current = null;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0) {
-          // Swiped right → previous day
-          goBack();
-        } else {
-          // Swiped left → next day
-          goForward();
-        }
-      }
+      if (Math.abs(diff) > 50) (diff > 0 ? goBack : goForward)();
     },
     [goBack, goForward]
   );
@@ -98,280 +82,121 @@ const DailySummaryStrip = ({ transactions }: DailySummaryStripProps) => {
   }, [earned, spent, net]);
 
   const dateLabel = format(selectedDate, "EEEE, MMMM d").toUpperCase();
+  const formatNet = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "") + formatUGX(Math.abs(v));
 
-  const formatNet = (value: number) => {
-    const prefix = value > 0 ? "+" : value < 0 ? "−" : "";
-    return prefix + formatUGX(Math.abs(value));
-  };
+  const hasEntries = earnedEntries.length > 0 || spentEntries.length > 0;
 
   return (
     <div
-      ref={cardRef}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      style={{
-        background: "#161616",
-        borderRadius: 16,
-        border: "0.5px solid #1E1E1E",
-        padding: 16,
-        position: "relative",
-        userSelect: "none",
-        touchAction: "pan-y",
-        overflow: "hidden",
-      }}
+      className="relative select-none"
+      style={{ touchAction: "pan-y" }}
     >
-      {/* Left chevron */}
-      {canGoBack && (
+      {/* Date with chevrons */}
+      <div className="flex items-center justify-center gap-2 mb-3">
         <button
           onClick={goBack}
+          disabled={!canGoBack}
           aria-label="Previous day"
-          style={{
-            position: "absolute",
-            left: 4,
-            top: "50%",
-            transform: "translateY(-50%)",
-            background: "none",
-            border: "none",
-            color: "#555",
-            fontSize: 18,
-            cursor: "pointer",
-            padding: "8px 4px",
-            lineHeight: 1,
-            zIndex: 2,
-          }}
+          className="text-muted-foreground disabled:opacity-30 px-2 text-base leading-none"
         >
           ‹
         </button>
-      )}
-
-      {/* Right chevron */}
-      {canGoForward && (
+        <p className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground">
+          {dateLabel}
+        </p>
         <button
           onClick={goForward}
+          disabled={!canGoForward}
           aria-label="Next day"
-          style={{
-            position: "absolute",
-            right: 4,
-            top: "50%",
-            transform: "translateY(-50%)",
-            background: "none",
-            border: "none",
-            color: "#555",
-            fontSize: 18,
-            cursor: "pointer",
-            padding: "8px 4px",
-            lineHeight: 1,
-            zIndex: 2,
-          }}
+          className="text-muted-foreground disabled:opacity-30 px-2 text-base leading-none"
         >
           ›
         </button>
-      )}
+      </div>
 
-      {/* Date */}
-      <p
-        style={{
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          color: "#666",
-          marginBottom: 12,
-          textAlign: "center",
-        }}
-      >
-        {dateLabel}
-      </p>
-
-      {/* Three columns */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 8,
-          textAlign: "center",
-          alignItems: "start",
-        }}
-      >
-        {/* Earned */}
-        <div>
-          <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Earned</p>
-          <p
-            style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: 18,
-              fontWeight: 700,
-              color: "#4CC98F",
-              lineHeight: 1.2,
-              wordBreak: "break-all",
-            }}
-          >
+      {/* Totals row — inline, no wrap */}
+      <div className="grid grid-cols-3 gap-3 text-center items-end">
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground mb-1">Earned</p>
+          <p className="font-display font-bold text-success text-base sm:text-lg whitespace-nowrap overflow-hidden text-ellipsis">
             {formatUGX(earned)}
           </p>
-          {expanded && earnedEntries.length > 0 && (
-            <ColumnEntries
-              entries={earnedEntries}
-              accent="#4CC98F"
-              formatUGX={formatUGX}
-            />
-          )}
         </div>
-
-        {/* Spent */}
-        <div>
-          <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Spent</p>
-          <p
-            style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: 18,
-              fontWeight: 700,
-              color: "#C94C4C",
-              lineHeight: 1.2,
-              wordBreak: "break-all",
-            }}
-          >
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground mb-1">Spent</p>
+          <p className="font-display font-bold text-destructive text-base sm:text-lg whitespace-nowrap overflow-hidden text-ellipsis">
             {formatUGX(spent)}
           </p>
-          {expanded && spentEntries.length > 0 && (
-            <ColumnEntries
-              entries={spentEntries}
-              accent="#C94C4C"
-              formatUGX={formatUGX}
-              negative
-            />
-          )}
         </div>
-
-        {/* Net */}
-        <div>
-          <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>Net</p>
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground mb-1">Net</p>
           <p
-            style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: 18,
-              fontWeight: 700,
-              color: net >= 0 ? "#4CC98F" : "#C94C4C",
-              lineHeight: 1.2,
-              wordBreak: "break-all",
-            }}
+            className={`font-display font-bold text-base sm:text-lg whitespace-nowrap overflow-hidden text-ellipsis ${
+              net >= 0 ? "text-success" : "text-destructive"
+            }`}
           >
             {formatNet(net)}
           </p>
         </div>
       </div>
 
-      {/* Verdict */}
-      <p
-        style={{
-          fontSize: 12,
-          fontStyle: "italic",
-          color: "#555",
-          textAlign: "center",
-          marginTop: 12,
-        }}
-      >
-        {verdict}
-      </p>
+      <p className="text-xs italic text-muted-foreground text-center mt-3">{verdict}</p>
 
-      {/* Collapsible toggle */}
-      {(earnedEntries.length > 0 || spentEntries.length > 0) && (
+      {hasEntries && (
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          aria-label={expanded ? "Hide details" : "Show details"}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 4,
-            margin: "10px auto 0",
-            background: "none",
-            border: "none",
-            color: "#888",
-            fontSize: 11,
-            fontWeight: 500,
-            cursor: "pointer",
-            padding: "4px 8px",
-          }}
+          className="mx-auto mt-2 flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
         >
           {expanded ? "Hide details" : "Show details"}
           <ChevronDown
-            className="w-3.5 h-3.5"
-            style={{
-              transition: "transform 200ms ease",
-              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-            }}
+            className="w-3.5 h-3.5 transition-transform"
+            style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
           />
         </button>
+      )}
+
+      {expanded && hasEntries && (
+        <div className="mt-3 overflow-hidden">
+          <table className="w-full text-xs">
+            <tbody>
+              {earnedEntries.map((t) => (
+                <EntryRow key={t.id} t={t} accent="text-success" sign="+" formatUGX={formatUGX} />
+              ))}
+              {spentEntries.map((t) => (
+                <EntryRow key={t.id} t={t} accent="text-destructive" sign="−" formatUGX={formatUGX} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 };
 
-const ColumnEntries = ({
-  entries,
+const EntryRow = ({
+  t,
   accent,
+  sign,
   formatUGX,
-  negative,
 }: {
-  entries: Transaction[];
+  t: Transaction;
   accent: string;
+  sign: string;
   formatUGX: (n: number) => string;
-  negative?: boolean;
 }) => (
-  <div
-    style={{
-      marginTop: 10,
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-      textAlign: "left",
-    }}
-  >
-    {entries.map((t) => (
-      <div
-        key={t.id}
-        style={{
-          background: "#0F0F0F",
-          border: "0.5px solid #1E1E1E",
-          borderRadius: 8,
-          padding: "6px 8px",
-        }}
-      >
-        <p
-          style={{
-            fontSize: 11,
-            color: "#D0D0D0",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {t.description}
-        </p>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 4,
-            marginTop: 2,
-          }}
-        >
-          <span style={{ fontSize: 9, color: "#666" }}>{t.category}</span>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: accent,
-            }}
-          >
-            {negative ? "−" : "+"}
-            {formatUGX(Math.abs(t.ugx_amount))}
-          </span>
-        </div>
-      </div>
-    ))}
-  </div>
+  <tr className="border-b border-border/60" style={{ borderBottomWidth: "0.5px" }}>
+    <td className="py-2 pr-2 align-top min-w-0">
+      <p className="text-foreground truncate text-[12px]">{t.description}</p>
+      <p className="text-[10px] text-muted-foreground">{t.category}</p>
+    </td>
+    <td className={`py-2 pl-2 text-right align-top font-medium whitespace-nowrap ${accent}`}>
+      {sign}
+      {formatUGX(Math.abs(t.ugx_amount))}
+    </td>
+  </tr>
 );
 
 export default DailySummaryStrip;
